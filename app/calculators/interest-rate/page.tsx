@@ -4,6 +4,14 @@ import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { calculateLoan, CalculationResult } from "./loanCalculations";
 
+// Format number with commas for display
+function formatNumber(num: number, decimals: number = 2): string {
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 export default function InterestRateCalculator() {
   const [principal, setPrincipal] = useState<string>("");
   const [monthlyPayment, setMonthlyPayment] = useState<string>("");
@@ -207,7 +215,7 @@ export default function InterestRateCalculator() {
                     Initial Balance (Principal)
                   </div>
                   <div className="text-2xl font-bold">
-                    ${result.principal.toFixed(2)}
+                    ${formatNumber(result.principal)}
                     {result.calculatedField === "principal" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -221,7 +229,7 @@ export default function InterestRateCalculator() {
                     Monthly Payment
                   </div>
                   <div className="text-2xl font-bold">
-                    ${result.monthlyPayment.toFixed(2)}
+                    ${formatNumber(result.monthlyPayment)}
                     {result.calculatedField === "monthlyPayment" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -235,7 +243,7 @@ export default function InterestRateCalculator() {
                     Annual Interest Rate
                   </div>
                   <div className="text-2xl font-bold">
-                    {result.annualInterestRate.toFixed(3)}%
+                    {formatNumber(result.annualInterestRate, 3)}%
                     {result.calculatedField === "annualInterestRate" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -249,7 +257,7 @@ export default function InterestRateCalculator() {
                     Term
                   </div>
                   <div className="text-2xl font-bold">
-                    {result.termMonths.toFixed(1)} months
+                    {formatNumber(result.termMonths, 1)} months
                     {result.calculatedField === "termMonths" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -257,7 +265,7 @@ export default function InterestRateCalculator() {
                     )}
                   </div>
                   <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    ({(result.termMonths / 12).toFixed(1)} years)
+                    ({formatNumber(result.termMonths / 12, 1)} years)
                   </div>
                 </div>
 
@@ -271,7 +279,7 @@ export default function InterestRateCalculator() {
                         Total Amount Paid:
                       </span>
                       <span className="font-semibold">
-                        ${result.totalPaid.toFixed(2)}
+                        ${formatNumber(result.totalPaid)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -279,7 +287,7 @@ export default function InterestRateCalculator() {
                         Total Interest:
                       </span>
                       <span className="font-semibold">
-                        ${result.totalInterest.toFixed(2)}
+                        ${formatNumber(result.totalInterest)}
                       </span>
                     </div>
                   </div>
