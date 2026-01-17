@@ -1,8 +1,21 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { calculateLoan, CalculationResult } from "./loanCalculations";
+
+// Format number with commas for display
+function formatNumber(num: number, decimals: number = 2): string {
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+interface HistoryItem extends CalculationResult {
+  timestamp: number;
+  id: string;
+}
 
 export default function InterestRateCalculator() {
   const [principal, setPrincipal] = useState<string>("");
@@ -11,6 +24,26 @@ export default function InterestRateCalculator() {
   const [termMonths, setTermMonths] = useState<string>("");
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [error, setError] = useState<string>("");
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("calculatorHistory");
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to load history:", e);
+      }
+    }
+  }, []);
+
+  // Save history to localStorage whenever it changes
+  useEffect(() => {
+    if (history.length > 0) {
+      localStorage.setItem("calculatorHistory", JSON.stringify(history));
+    }
+  }, [history]);
 
   const handleCalculate = (e: FormEvent) => {
     e.preventDefault();
@@ -48,6 +81,14 @@ export default function InterestRateCalculator() {
 
       const calculationResult = calculateLoan(params);
       setResult(calculationResult);
+
+      // Add to history
+      const historyItem: HistoryItem = {
+        ...calculationResult,
+        timestamp: Date.now(),
+        id: `${Date.now()}-${Math.random()}`,
+      };
+      setHistory((prev) => [historyItem, ...prev].slice(0, 20)); // Keep last 20
     } catch (err) {
       setError(err instanceof Error ? err.message : "Calculation error");
     }
@@ -62,9 +103,23 @@ export default function InterestRateCalculator() {
     setError("");
   };
 
+  const handleLoadFromHistory = (item: HistoryItem) => {
+    setPrincipal(item.principal.toString());
+    setMonthlyPayment(item.monthlyPayment.toString());
+    setAnnualInterestRate(item.annualInterestRate.toString());
+    setTermMonths(item.termMonths.toString());
+    setResult(item);
+    setError("");
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem("calculatorHistory");
+  };
+
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <Link
             href="/"
@@ -83,7 +138,7 @@ export default function InterestRateCalculator() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
             <form onSubmit={handleCalculate} className="space-y-4">
               <div>
@@ -207,7 +262,7 @@ export default function InterestRateCalculator() {
                     Initial Balance (Principal)
                   </div>
                   <div className="text-2xl font-bold">
-                    ${result.principal.toFixed(2)}
+                    ${formatNumber(result.principal)}
                     {result.calculatedField === "principal" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -221,7 +276,7 @@ export default function InterestRateCalculator() {
                     Monthly Payment
                   </div>
                   <div className="text-2xl font-bold">
-                    ${result.monthlyPayment.toFixed(2)}
+                    ${formatNumber(result.monthlyPayment)}
                     {result.calculatedField === "monthlyPayment" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -235,7 +290,7 @@ export default function InterestRateCalculator() {
                     Annual Interest Rate
                   </div>
                   <div className="text-2xl font-bold">
-                    {result.annualInterestRate.toFixed(3)}%
+                    {formatNumber(result.annualInterestRate, 3)}%
                     {result.calculatedField === "annualInterestRate" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -249,7 +304,7 @@ export default function InterestRateCalculator() {
                     Term
                   </div>
                   <div className="text-2xl font-bold">
-                    {result.termMonths.toFixed(1)} months
+                    {formatNumber(result.termMonths, 1)} months
                     {result.calculatedField === "termMonths" && (
                       <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                         ✓ Calculated
@@ -257,7 +312,7 @@ export default function InterestRateCalculator() {
                     )}
                   </div>
                   <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                    ({(result.termMonths / 12).toFixed(1)} years)
+                    ({formatNumber(result.termMonths / 12, 1)} years)
                   </div>
                 </div>
 
@@ -271,7 +326,7 @@ export default function InterestRateCalculator() {
                         Total Amount Paid:
                       </span>
                       <span className="font-semibold">
-                        ${result.totalPaid.toFixed(2)}
+                        ${formatNumber(result.totalPaid)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -279,7 +334,7 @@ export default function InterestRateCalculator() {
                         Total Interest:
                       </span>
                       <span className="font-semibold">
-                        ${result.totalInterest.toFixed(2)}
+                        ${formatNumber(result.totalInterest)}
                       </span>
                     </div>
                   </div>
@@ -287,6 +342,92 @@ export default function InterestRateCalculator() {
               </div>
             </div>
           )}
+
+          {/* History Column */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700 xl:col-span-1">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold">Recent Calculations</h2>
+              {history.length > 0 && (
+                <button
+                  onClick={handleClearHistory}
+                  className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                  title="Clear all history"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {history.length === 0 ? (
+              <p className="text-slate-500 dark:text-slate-400 text-sm text-center py-8">
+                No calculations yet. Your recent calculations will appear here.
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {history.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleLoadFromHistory(item)}
+                    className="w-full text-left p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {new Date(item.timestamp).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                        {item.calculatedField === "principal"
+                          ? "Principal"
+                          : item.calculatedField === "monthlyPayment"
+                          ? "Payment"
+                          : item.calculatedField === "annualInterestRate"
+                          ? "Rate"
+                          : "Term"}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Principal:
+                        </span>
+                        <span className="font-medium">
+                          ${formatNumber(item.principal, 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Payment:
+                        </span>
+                        <span className="font-medium">
+                          ${formatNumber(item.monthlyPayment, 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Rate:
+                        </span>
+                        <span className="font-medium">
+                          {formatNumber(item.annualInterestRate, 2)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">
+                          Term:
+                        </span>
+                        <span className="font-medium">
+                          {formatNumber(item.termMonths, 0)} mo
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>

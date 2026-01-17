@@ -30,14 +30,25 @@ function calculateMonthlyPayment(
   termMonths: number
 ): number {
   if (annualRate === 0) {
-    return principal / termMonths;
+    const payment = principal / termMonths;
+    if (!isFinite(payment) || payment <= 0) {
+      throw new Error("Unable to calculate a valid monthly payment with these parameters");
+    }
+    return payment;
   }
 
   const monthlyRate = annualRate / 12 / 100;
   const numerator = principal * monthlyRate * Math.pow(1 + monthlyRate, termMonths);
   const denominator = Math.pow(1 + monthlyRate, termMonths) - 1;
 
-  return numerator / denominator;
+  const payment = numerator / denominator;
+
+  // Validate the result
+  if (!isFinite(payment) || payment <= 0) {
+    throw new Error("Unable to calculate a valid monthly payment with these parameters");
+  }
+
+  return payment;
 }
 
 // Calculate principal given monthly payment, rate, and term
@@ -47,14 +58,25 @@ function calculatePrincipal(
   termMonths: number
 ): number {
   if (annualRate === 0) {
-    return monthlyPayment * termMonths;
+    const principal = monthlyPayment * termMonths;
+    if (!isFinite(principal) || principal <= 0) {
+      throw new Error("Unable to calculate a valid principal with these parameters");
+    }
+    return principal;
   }
 
   const monthlyRate = annualRate / 12 / 100;
   const numerator = monthlyPayment * (Math.pow(1 + monthlyRate, termMonths) - 1);
   const denominator = monthlyRate * Math.pow(1 + monthlyRate, termMonths);
 
-  return numerator / denominator;
+  const principal = numerator / denominator;
+
+  // Validate the result
+  if (!isFinite(principal) || principal <= 0) {
+    throw new Error("Unable to calculate a valid principal with these parameters");
+  }
+
+  return principal;
 }
 
 // Calculate term given principal, monthly payment, and rate
@@ -64,20 +86,41 @@ function calculateTerm(
   annualRate: number
 ): number {
   if (annualRate === 0) {
-    return principal / monthlyPayment;
+    const term = principal / monthlyPayment;
+    if (term <= 0 || !isFinite(term)) {
+      throw new Error("Unable to calculate a valid loan term with these parameters");
+    }
+    return term;
   }
 
   const monthlyRate = annualRate / 12 / 100;
+  const minPayment = principal * monthlyRate;
 
   // Check if payment is sufficient
-  if (monthlyPayment <= principal * monthlyRate) {
-    throw new Error("Monthly payment is too low to pay off the loan");
+  if (monthlyPayment <= minPayment) {
+    throw new Error(
+      `Monthly payment ($${monthlyPayment.toFixed(2)}) is too low to pay off the loan. At ${annualRate.toFixed(2)}% interest, you need at least $${(minPayment + 0.01).toFixed(2)}/month just to cover the interest.`
+    );
   }
 
   const numerator = Math.log(monthlyPayment / (monthlyPayment - principal * monthlyRate));
   const denominator = Math.log(1 + monthlyRate);
 
-  return numerator / denominator;
+  const term = numerator / denominator;
+
+  // Validate the result
+  if (!isFinite(term) || term <= 0) {
+    throw new Error("Unable to calculate a valid loan term with these parameters");
+  }
+
+  // Check for unreasonably long terms (more than 100 years)
+  if (term > 1200) {
+    throw new Error(
+      `The calculated term is unreasonably long (${(term / 12).toFixed(1)} years). Please check your inputs.`
+    );
+  }
+
+  return term;
 }
 
 // Calculate interest rate using Newton-Raphson method
@@ -86,9 +129,24 @@ function calculateInterestRate(
   monthlyPayment: number,
   termMonths: number
 ): number {
+  // Check if payment is less than principal divided by term - this indicates negative interest
+  const minPayment = principal / termMonths;
+  if (monthlyPayment < minPayment * 0.99) {
+    throw new Error(
+      `Monthly payment ($${monthlyPayment.toFixed(2)}) is too low. With this payment, you would never pay off the loan. Minimum payment needed: $${minPayment.toFixed(2)}`
+    );
+  }
+
   // Check if zero interest rate works
-  if (Math.abs(principal / termMonths - monthlyPayment) < 0.01) {
+  if (Math.abs(minPayment - monthlyPayment) < 0.01) {
     return 0;
+  }
+
+  // Check if payment is unreasonably high (would indicate negative or impossible interest rate)
+  if (monthlyPayment > principal) {
+    throw new Error(
+      "Monthly payment is higher than the principal amount, which suggests an invalid scenario"
+    );
   }
 
   // Initial guess: 5% annual rate
@@ -96,6 +154,7 @@ function calculateInterestRate(
   let iterations = 0;
   const maxIterations = 100;
   const tolerance = 0.0001;
+  let lastRate = annualRate;
 
   while (iterations < maxIterations) {
     const monthlyRate = annualRate / 12 / 100;
@@ -130,14 +189,29 @@ function calculateInterestRate(
       return newRate;
     }
 
+    lastRate = annualRate;
     annualRate = newRate;
 
-    // Ensure rate stays positive
+    // Ensure rate stays positive and reasonable
     if (annualRate < 0) {
       annualRate = 0.01;
     }
 
+    // Ensure rate doesn't exceed reasonable bounds (e.g., 100%)
+    if (annualRate > 100) {
+      throw new Error(
+        "Unable to calculate a reasonable interest rate. Please check your inputs."
+      );
+    }
+
     iterations++;
+  }
+
+  // If we hit max iterations, check if we got close enough
+  if (iterations >= maxIterations) {
+    throw new Error(
+      "Unable to calculate interest rate with the given parameters. The values may be inconsistent."
+    );
   }
 
   return annualRate;
