@@ -8,6 +8,12 @@ export default function Home() {
       href: "/calculators/interest-rate",
       icon: "💰",
     },
+    {
+      name: "Time Report Generator",
+      description: "Generate sample labor cost datasets for payroll testing",
+      href: "/calculators/time-report",
+      icon: "📊",
+    },
   ];
 
   return (
