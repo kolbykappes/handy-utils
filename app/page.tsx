@@ -14,6 +14,12 @@ export default function Home() {
       href: "/calculators/time-report",
       icon: "📊",
     },
+    {
+      name: "Markdown ↔ HTML Converter",
+      description: "Bidirectional converter with live sync and GitHub-flavored markdown",
+      href: "/converters/markdown-html",
+      icon: "🔄",
+    },
   ];
 
   return (
