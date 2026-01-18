@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { EMPLOYEES, DEFAULT_WITHHOLDING_RATE } from "./employees";
 import { generateTimeReport, generateCSV, downloadCSV, downloadExcel } from "./generator";
-import { TimeEntry } from "./types";
+import { TimeEntry, Employee } from "./types";
 
 function formatNumber(num: number, decimals: number = 2): string {
   return num.toLocaleString("en-US", {
@@ -20,6 +20,20 @@ export default function TimeReportGenerator() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [generating, setGenerating] = useState<boolean>(false);
+  const [employees, setEmployees] = useState<Employee[]>(EMPLOYEES);
+
+  // Load custom employees from localStorage on mount
+  useEffect(() => {
+    const savedEmployees = localStorage.getItem("customEmployees");
+    if (savedEmployees) {
+      try {
+        setEmployees(JSON.parse(savedEmployees));
+      } catch (e) {
+        console.error("Failed to load custom employees:", e);
+        setEmployees(EMPLOYEES);
+      }
+    }
+  }, []);
 
   const handleGenerate = (e: FormEvent) => {
     e.preventDefault();
@@ -43,7 +57,7 @@ export default function TimeReportGenerator() {
         return;
       }
 
-      const generated = generateTimeReport(EMPLOYEES, {
+      const generated = generateTimeReport(employees, {
         startDate: start,
         endDate: end,
         witholdingRate: rate,
@@ -222,11 +236,19 @@ export default function TimeReportGenerator() {
 
             {/* Employee List */}
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-              <h3 className="text-sm font-semibold mb-3">
-                Employees ({EMPLOYEES.length})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold">
+                  Employees ({employees.length})
+                </h3>
+                <Link
+                  href="/calculators/time-report/employees-editor"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  ⚙️ Edit
+                </Link>
+              </div>
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {EMPLOYEES.map((emp) => (
+                {employees.map((emp) => (
                   <div
                     key={emp.name}
                     className="flex justify-between items-center text-xs p-2 bg-slate-50 dark:bg-slate-700/50 rounded"
