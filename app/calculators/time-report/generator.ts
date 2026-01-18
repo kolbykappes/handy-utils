@@ -1,5 +1,6 @@
 import { Employee, TimeEntry, GenerationOptions } from "./types";
 import { HOLIDAYS_2025_2026 } from "./employees";
+import * as XLSX from "xlsx";
 
 // Helper function to format date as MM/DD/YYYY
 function formatDate(date: Date): string {
@@ -202,4 +203,38 @@ export function downloadCSV(csv: string, filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+export function downloadExcel(entries: TimeEntry[], filename: string): void {
+  // Prepare data for Excel
+  const data = entries.map((entry) => ({
+    Date: entry.date,
+    "Employee Name": entry.employeeName,
+    "Hours Worked": entry.hoursWorked,
+    "Hourly Rate": entry.hourlyRate,
+    "Gross Pay": entry.grossPay,
+    Withholdings: entry.withholdings,
+    "Net Pay": entry.netPay,
+  }));
+
+  // Create worksheet
+  const worksheet = XLSX.utils.json_to_sheet(data);
+
+  // Set column widths
+  worksheet["!cols"] = [
+    { wch: 12 }, // Date
+    { wch: 20 }, // Employee Name
+    { wch: 13 }, // Hours Worked
+    { wch: 12 }, // Hourly Rate
+    { wch: 12 }, // Gross Pay
+    { wch: 13 }, // Withholdings
+    { wch: 12 }, // Net Pay
+  ];
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Time Report");
+
+  // Generate Excel file and trigger download
+  XLSX.writeFile(workbook, filename);
 }

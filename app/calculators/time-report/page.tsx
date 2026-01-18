@@ -3,7 +3,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { EMPLOYEES, DEFAULT_WITHHOLDING_RATE } from "./employees";
-import { generateTimeReport, generateCSV, downloadCSV } from "./generator";
+import { generateTimeReport, generateCSV, downloadCSV, downloadExcel } from "./generator";
 import { TimeEntry } from "./types";
 
 function formatNumber(num: number, decimals: number = 2): string {
@@ -63,6 +63,13 @@ export default function TimeReportGenerator() {
     const csv = generateCSV(entries);
     const filename = `time-report-${startDate}-to-${endDate}.csv`;
     downloadCSV(csv, filename);
+  };
+
+  const handleDownloadExcel = () => {
+    if (entries.length === 0) return;
+
+    const filename = `time-report-${startDate}-to-${endDate}.xlsx`;
+    downloadExcel(entries, filename);
   };
 
   const calculateTotals = () => {
@@ -193,13 +200,22 @@ export default function TimeReportGenerator() {
                 </button>
 
                 {entries.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleDownloadCSV}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-lg transition-colors"
-                  >
-                    Download CSV
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDownloadExcel}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-lg transition-colors"
+                    >
+                      📊 Download Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadCSV}
+                      className="w-full bg-slate-600 hover:bg-slate-700 text-white font-medium py-3 rounded-lg transition-colors"
+                    >
+                      📄 Download CSV
+                    </button>
+                  </>
                 )}
               </div>
             </form>
@@ -331,6 +347,51 @@ export default function TimeReportGenerator() {
             </div>
           )}
         </div>
+
+        {/* Data Grid */}
+        {entries.length > 0 && (
+          <div className="mt-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
+            <h2 className="text-2xl font-bold mb-4">Time Entries ({entries.length})</h2>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-100 dark:bg-slate-700 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold">Employee Name</th>
+                    <th className="px-4 py-3 text-right font-semibold">Hours Worked</th>
+                    <th className="px-4 py-3 text-right font-semibold">Hourly Rate</th>
+                    <th className="px-4 py-3 text-right font-semibold">Gross Pay</th>
+                    <th className="px-4 py-3 text-right font-semibold">Withholdings</th>
+                    <th className="px-4 py-3 text-right font-semibold">Net Pay</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {entries.map((entry, index) => (
+                    <tr
+                      key={`${entry.date}-${entry.employeeName}-${index}`}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap">{entry.date}</td>
+                      <td className="px-4 py-2">{entry.employeeName}</td>
+                      <td className="px-4 py-2 text-right">{entry.hoursWorked.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">${entry.hourlyRate.toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right text-green-600 dark:text-green-400">
+                        ${formatNumber(entry.grossPay)}
+                      </td>
+                      <td className="px-4 py-2 text-right text-red-600 dark:text-red-400">
+                        ${formatNumber(entry.withholdings)}
+                      </td>
+                      <td className="px-4 py-2 text-right font-medium">
+                        ${formatNumber(entry.netPay)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
