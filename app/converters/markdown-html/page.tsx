@@ -131,6 +131,104 @@ export default function MarkdownHtmlConverter() {
     }
   };
 
+  const handleClear = () => {
+    setMarkdown("");
+    if (htmlEditableRef.current) {
+      htmlEditableRef.current.innerHTML = "";
+    }
+  };
+
+  const handleLoadSample = () => {
+    const sample = `# GitHub Flavored Markdown Demo
+
+This document demonstrates all major GitHub Flavored Markdown (GFM) features.
+
+## Text Formatting
+
+You can make text **bold**, *italic*, or ***bold and italic***.
+You can also use ~~strikethrough~~ text.
+
+## Lists
+
+### Unordered List
+- Item 1
+- Item 2
+  - Nested item 2.1
+  - Nested item 2.2
+- Item 3
+
+### Ordered List
+1. First item
+2. Second item
+3. Third item
+
+### Task List
+- [x] Completed task
+- [ ] Incomplete task
+- [ ] Another task
+
+## Links and Images
+
+[Visit GitHub](https://github.com)
+
+Inline link: <https://example.com>
+
+## Code
+
+Inline code: \`const x = 42;\`
+
+### Code Block with Syntax Highlighting
+
+\`\`\`javascript
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+console.log(fibonacci(10));
+\`\`\`
+
+\`\`\`python
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("World"))
+\`\`\`
+
+## Tables
+
+| Feature | Supported | Notes |
+|---------|-----------|-------|
+| Tables | ✓ | With alignment |
+| Task lists | ✓ | Interactive checkboxes |
+| Emoji | ✓ | :rocket: :sparkles: |
+| Syntax highlighting | ✓ | Multiple languages |
+
+## Blockquotes
+
+> This is a blockquote.
+> It can span multiple lines.
+>
+> > Nested blockquotes are also possible.
+
+## Horizontal Rules
+
+---
+
+## Emoji
+
+You can use emoji! :smile: :rocket: :heart: :sparkles:
+
+## HTML Support
+
+You can also use <mark>HTML tags</mark> for additional <u>formatting</u>.
+
+---
+
+**Note:** This converter supports bidirectional editing!`;
+    setMarkdown(sample);
+  };
+
   return (
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-[1600px] mx-auto">
@@ -156,12 +254,26 @@ export default function MarkdownHtmlConverter() {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <h2 className="text-xl font-bold">Markdown</h2>
-              <button
-                onClick={handleCopyMarkdown}
-                className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                📋 Copy
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleClear}
+                  className="text-sm bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors"
+                >
+                  🗑️ Clear
+                </button>
+                <button
+                  onClick={handleLoadSample}
+                  className="text-sm bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors"
+                >
+                  📝 Sample
+                </button>
+                <button
+                  onClick={handleCopyMarkdown}
+                  className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  📋 Copy
+                </button>
+              </div>
             </div>
             <div className="flex-1 p-4">
               <textarea
