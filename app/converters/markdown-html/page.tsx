@@ -178,11 +178,23 @@ Following up on our conversation today to document your upcoming compensation ch
               {htmlViewMode === "preview" ? (
                 <div
                   ref={previewRef}
-                  className="prose prose-slate dark:prose-invert max-w-none"
+                  className="prose prose-slate dark:prose-invert max-w-none prose-compact"
+                  style={{
+                    lineHeight: '1.4',
+                  }}
                 >
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                    components={{
+                      p: ({node, ...props}) => <p style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                      ul: ({node, ...props}) => <ul style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                      ol: ({node, ...props}) => <ol style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                      li: ({node, ...props}) => <li style={{marginTop: '0.25em', marginBottom: '0.25em'}} {...props} />,
+                      h1: ({node, ...props}) => <h1 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                      h2: ({node, ...props}) => <h2 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                      h3: ({node, ...props}) => <h3 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
+                    }}
                   >
                     {markdown}
                   </ReactMarkdown>
@@ -208,13 +220,12 @@ Following up on our conversation today to document your upcoming compensation ch
 
         {/* Info Section */}
         <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-2">✨ Features:</h3>
+          <h3 className="font-semibold mb-2">✨ How to use:</h3>
           <ul className="text-sm space-y-1 text-slate-700 dark:text-slate-300">
-            <li>• <strong>Bidirectional sync:</strong> Edit either pane and see the other update</li>
-            <li>• <strong>Line break handling:</strong> Single line breaks are preserved</li>
+            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview on the right</li>
+            <li>• <strong>Edit HTML:</strong> Switch to "Code" tab on the right, paste/edit HTML, see markdown on the left</li>
+            <li>• <strong>Line breaks:</strong> Single line breaks are preserved in both directions</li>
             <li>• <strong>GitHub-flavored markdown:</strong> Tables, task lists, strikethrough, and more</li>
-            <li>• <strong>Preview mode:</strong> See rendered HTML output</li>
-            <li>• <strong>Code mode:</strong> Edit raw HTML and convert to markdown</li>
             <li>• <strong>Copy buttons:</strong> Easy clipboard copying for both formats</li>
           </ul>
         </div>
