@@ -108,9 +108,26 @@ export default function MarkdownHtmlConverter() {
     navigator.clipboard.writeText(markdown);
   };
 
-  const handleCopyHtml = () => {
+  const handleCopyHtml = async () => {
     if (htmlEditableRef.current) {
-      navigator.clipboard.writeText(htmlEditableRef.current.innerHTML);
+      const htmlContent = htmlEditableRef.current.innerHTML;
+
+      try {
+        // Copy as rich text (HTML) so it can be pasted into email/Word
+        const blobHtml = new Blob([htmlContent], { type: "text/html" });
+        const blobText = new Blob([htmlEditableRef.current.innerText], { type: "text/plain" });
+
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": blobHtml,
+            "text/plain": blobText,
+          }),
+        ]);
+      } catch (err) {
+        // Fallback to plain text if clipboard API fails
+        console.error("Failed to copy as HTML, falling back to text:", err);
+        navigator.clipboard.writeText(htmlContent);
+      }
     }
   };
 
