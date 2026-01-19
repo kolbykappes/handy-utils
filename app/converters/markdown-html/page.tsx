@@ -106,36 +106,33 @@ export default function MarkdownHtmlConverter() {
 
   const handleCopyMarkdown = () => {
     navigator.clipboard.writeText(markdown);
-    alert("Markdown copied to clipboard!");
   };
 
   const handleCopyHtml = () => {
     if (htmlEditableRef.current) {
       navigator.clipboard.writeText(htmlEditableRef.current.innerHTML);
-      alert("HTML copied to clipboard!");
     }
   };
 
   return (
-    <main className="min-h-screen p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
+    <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="mb-3 flex items-center justify-between">
           <Link
             href="/"
-            className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
+            className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 text-sm"
           >
             ← Back to Home
           </Link>
+          <div className="text-right">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Markdown ↔ HTML Converter
+            </h1>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Bidirectional converter with live sync
+            </p>
+          </div>
         </div>
-
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Markdown ↔ HTML Converter
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Bidirectional converter with live sync. Edit either pane and see the other update instantly.
-          </p>
-        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Markdown Pane */}
@@ -174,7 +171,7 @@ Following up on our conversation today to document your upcoming compensation ch
 - You'll move from hourly time tracking to salary basis
 - Standard benefits and expectations for salaried employees will apply
 - We have additional compensation increases budgeted for later in 2026 as you continue to take on more responsibility"
-                className="w-full h-[600px] p-4 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 resize-none"
+                className="w-full h-[700px] p-4 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 resize-none"
               />
             </div>
           </div>
@@ -199,7 +196,7 @@ Following up on our conversation today to document your upcoming compensation ch
                 onPaste={handleHtmlPaste}
                 onInput={handleHtmlInput}
                 suppressContentEditableWarning
-                className="prose prose-slate dark:prose-invert max-w-none min-h-[600px] outline-none p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
+                className="prose prose-slate dark:prose-invert max-w-none min-h-[700px] outline-none p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
                 style={{
                   lineHeight: '1.4',
                 }}
@@ -209,15 +206,8 @@ Following up on our conversation today to document your upcoming compensation ch
         </div>
 
         {/* Info Section */}
-        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h3 className="font-semibold mb-2">✨ How to use:</h3>
-          <ul className="text-sm space-y-1 text-slate-700 dark:text-slate-300">
-            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview update instantly on the right</li>
-            <li>• <strong>Edit HTML:</strong> Click into the right pane, type or paste HTML (converts to markdown after 0.5s pause or on blur)</li>
-            <li>• <strong>Both panes are fully editable</strong> with cursor position preserved while typing</li>
-            <li>• <strong>Line breaks:</strong> Single line breaks are preserved in both directions</li>
-            <li>• <strong>GitHub-flavored markdown:</strong> Tables, task lists, strikethrough, and more</li>
-          </ul>
+        <div className="mt-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2 text-xs text-slate-700 dark:text-slate-300">
+          <strong>Tips:</strong> Edit markdown (left) or HTML (right). Both panes are editable. HTML converts to markdown after 0.5s pause or on blur. GitHub-flavored markdown supported.
         </div>
       </div>
     </main>
