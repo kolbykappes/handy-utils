@@ -4,13 +4,23 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import TurndownService from "turndown";
+import { remark } from "remark";
+import remarkHtml from "remark-html";
 
 const turndownService = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
+  br: "\n",
+});
+
+// Configure turndown to preserve line breaks
+turndownService.addRule("lineBreak", {
+  filter: "br",
+  replacement: () => "  \n",
 });
 
 export default function MarkdownHtmlConverter() {
@@ -18,14 +28,23 @@ export default function MarkdownHtmlConverter() {
   const [html, setHtml] = useState<string>("");
   const [htmlViewMode, setHtmlViewMode] = useState<"preview" | "code">("preview");
   const [lastEdited, setLastEdited] = useState<"markdown" | "html">("markdown");
-  const markdownRef = useRef<HTMLTextAreaElement>(null);
-  const htmlRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
-  // Convert markdown to HTML when markdown changes
+  // Update HTML when markdown changes
   useEffect(() => {
-    if (lastEdited === "markdown") {
-      // We'll use the ReactMarkdown component to render, so we don't need to convert here
-      // Just trigger a re-render
+    if (lastEdited === "markdown" && markdown) {
+      // Convert markdown to HTML string
+      remark()
+        .use(remarkGfm)
+        .use(remarkBreaks)
+        .use(remarkHtml, { sanitize: false })
+        .process(markdown)
+        .then((file) => {
+          setHtml(String(file));
+        })
+        .catch((err) => {
+          console.error("Failed to convert markdown to HTML:", err);
+        });
     }
   }, [markdown, lastEdited]);
 
@@ -53,17 +72,8 @@ export default function MarkdownHtmlConverter() {
   };
 
   const handleCopyHtml = () => {
-    // Get the rendered HTML from the preview
-    const previewElement = document.getElementById("html-preview");
-    if (previewElement) {
-      navigator.clipboard.writeText(previewElement.innerHTML);
-      alert("HTML copied to clipboard!");
-    }
-  };
-
-  const handleCopyHtmlCode = () => {
     navigator.clipboard.writeText(html);
-    alert("HTML code copied to clipboard!");
+    alert("HTML copied to clipboard!");
   };
 
   return (
@@ -101,27 +111,29 @@ export default function MarkdownHtmlConverter() {
             </div>
             <div className="flex-1 p-4">
               <textarea
-                ref={markdownRef}
                 value={markdown}
                 onChange={(e) => handleMarkdownChange(e.target.value)}
                 placeholder="Paste or type your Markdown here...
 
-# Example
-- Lists
-- **Bold** and *italic*
-- [Links](https://example.com)
+**To:** Harper Kappes
+**From:** Kolby Kappes
+**Subject:** Compensation Update - Salary Transition
 
-| Tables | Are | Supported |
-|--------|-----|-----------|
-| Col 1  | Col 2 | Col 3   |
+Harper,
 
-```javascript
-// Code blocks too!
-console.log('Hello');
-```
+Following up on our conversation today to document your upcoming compensation change.
 
-- [ ] Task lists
-- [x] Also supported"
+**Effective Date:** Week of February 2nd, 2026
+
+**New Compensation Structure:**
+- Transition from hourly to salaried employee
+- Annual salary: $50,000
+- This represents approximately a $7,000 annual increase from your current rate
+
+**What This Means:**
+- You'll move from hourly time tracking to salary basis
+- Standard benefits and expectations for salaried employees will apply
+- We have additional compensation increases budgeted for later in 2026 as you continue to take on more responsibility"
                 className="w-full h-[600px] p-4 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 resize-none"
               />
             </div>
@@ -156,20 +168,20 @@ console.log('Hello');
                 </div>
               </div>
               <button
-                onClick={htmlViewMode === "preview" ? handleCopyHtml : handleCopyHtmlCode}
+                onClick={handleCopyHtml}
                 className="text-sm bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
               >
-                📋 Copy {htmlViewMode === "preview" ? "HTML" : "Code"}
+                📋 Copy HTML
               </button>
             </div>
             <div className="flex-1 p-4 overflow-auto">
               {htmlViewMode === "preview" ? (
                 <div
-                  id="html-preview"
+                  ref={previewRef}
                   className="prose prose-slate dark:prose-invert max-w-none"
                 >
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
                     rehypePlugins={[rehypeRaw, rehypeSanitize]}
                   >
                     {markdown}
@@ -177,8 +189,7 @@ console.log('Hello');
                 </div>
               ) : (
                 <textarea
-                  ref={htmlRef}
-                  value={html || document.getElementById("html-preview")?.innerHTML || ""}
+                  value={html}
                   onChange={(e) => handleHtmlChange(e.target.value)}
                   placeholder="Paste HTML here to convert to Markdown...
 
@@ -200,6 +211,7 @@ console.log('Hello');
           <h3 className="font-semibold mb-2">✨ Features:</h3>
           <ul className="text-sm space-y-1 text-slate-700 dark:text-slate-300">
             <li>• <strong>Bidirectional sync:</strong> Edit either pane and see the other update</li>
+            <li>• <strong>Line break handling:</strong> Single line breaks are preserved</li>
             <li>• <strong>GitHub-flavored markdown:</strong> Tables, task lists, strikethrough, and more</li>
             <li>• <strong>Preview mode:</strong> See rendered HTML output</li>
             <li>• <strong>Code mode:</strong> Edit raw HTML and convert to markdown</li>
