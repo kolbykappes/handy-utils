@@ -2,13 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
 import TurndownService from "turndown";
 import { remark } from "remark";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import remarkHtml from "remark-html";
 
 const turndownService = new TurndownService({
@@ -26,25 +23,52 @@ turndownService.addRule("lineBreak", {
 export default function MarkdownHtmlConverter() {
   const [markdown, setMarkdown] = useState<string>("");
   const [html, setHtml] = useState<string>("");
-  const htmlPreviewRef = useRef<HTMLDivElement>(null);
+  const htmlEditableRef = useRef<HTMLDivElement>(null);
+  const isEditingHtml = useRef(false);
+  const conversionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update HTML when markdown changes
+  // Update HTML when markdown changes (only if not currently editing HTML)
   useEffect(() => {
-    remark()
-      .use(remarkGfm)
-      .use(remarkBreaks)
-      .use(remarkHtml, { sanitize: false })
-      .process(markdown)
-      .then((file) => {
-        setHtml(String(file));
-      })
-      .catch((err) => {
-        console.error("Failed to convert markdown to HTML:", err);
-      });
+    if (!isEditingHtml.current && markdown !== undefined) {
+      remark()
+        .use(remarkGfm)
+        .use(remarkBreaks)
+        .use(remarkHtml, { sanitize: false })
+        .process(markdown)
+        .then((file) => {
+          const newHtml = String(file);
+          setHtml(newHtml);
+          // Only update the div if user is not actively editing
+          if (htmlEditableRef.current && !isEditingHtml.current) {
+            htmlEditableRef.current.innerHTML = newHtml;
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to convert markdown to HTML:", err);
+        });
+    }
   }, [markdown]);
 
   const handleMarkdownChange = (value: string) => {
     setMarkdown(value);
+  };
+
+  const handleHtmlFocus = () => {
+    isEditingHtml.current = true;
+  };
+
+  const handleHtmlBlur = () => {
+    isEditingHtml.current = false;
+    // Convert HTML to markdown on blur
+    if (htmlEditableRef.current) {
+      const htmlContent = htmlEditableRef.current.innerHTML;
+      try {
+        const md = turndownService.turndown(htmlContent);
+        setMarkdown(md);
+      } catch (err) {
+        console.error("Failed to convert HTML to markdown:", err);
+      }
+    }
   };
 
   const handleHtmlPaste = (e: React.ClipboardEvent) => {
@@ -54,19 +78,30 @@ export default function MarkdownHtmlConverter() {
     try {
       const md = turndownService.turndown(pastedHtml);
       setMarkdown(md);
+      isEditingHtml.current = false;
     } catch (err) {
       console.error("Failed to convert HTML to markdown:", err);
     }
   };
 
-  const handleHtmlInput = (e: React.FormEvent<HTMLDivElement>) => {
-    const htmlContent = e.currentTarget.innerHTML;
-    try {
-      const md = turndownService.turndown(htmlContent);
-      setMarkdown(md);
-    } catch (err) {
-      console.error("Failed to convert HTML to markdown:", err);
+  const handleHtmlInput = () => {
+    // Clear any existing timeout
+    if (conversionTimeoutRef.current) {
+      clearTimeout(conversionTimeoutRef.current);
     }
+
+    // Debounce conversion to avoid constant updates while typing
+    conversionTimeoutRef.current = setTimeout(() => {
+      if (htmlEditableRef.current) {
+        const htmlContent = htmlEditableRef.current.innerHTML;
+        try {
+          const md = turndownService.turndown(htmlContent);
+          setMarkdown(md);
+        } catch (err) {
+          console.error("Failed to convert HTML to markdown:", err);
+        }
+      }
+    }, 500); // Wait 500ms after last keystroke
   };
 
   const handleCopyMarkdown = () => {
@@ -75,8 +110,10 @@ export default function MarkdownHtmlConverter() {
   };
 
   const handleCopyHtml = () => {
-    navigator.clipboard.writeText(html);
-    alert("HTML copied to clipboard!");
+    if (htmlEditableRef.current) {
+      navigator.clipboard.writeText(htmlEditableRef.current.innerHTML);
+      alert("HTML copied to clipboard!");
+    }
   };
 
   return (
@@ -155,16 +192,17 @@ Following up on our conversation today to document your upcoming compensation ch
             </div>
             <div className="flex-1 p-4 overflow-auto">
               <div
-                ref={htmlPreviewRef}
+                ref={htmlEditableRef}
                 contentEditable
+                onFocus={handleHtmlFocus}
+                onBlur={handleHtmlBlur}
                 onPaste={handleHtmlPaste}
                 onInput={handleHtmlInput}
                 suppressContentEditableWarning
-                className="prose prose-slate dark:prose-invert max-w-none prose-compact min-h-[600px] outline-none p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
+                className="prose prose-slate dark:prose-invert max-w-none min-h-[600px] outline-none p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
                 style={{
                   lineHeight: '1.4',
                 }}
-                dangerouslySetInnerHTML={{ __html: html }}
               />
             </div>
           </div>
@@ -174,9 +212,9 @@ Following up on our conversation today to document your upcoming compensation ch
         <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <h3 className="font-semibold mb-2">✨ How to use:</h3>
           <ul className="text-sm space-y-1 text-slate-700 dark:text-slate-300">
-            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview update on the right</li>
-            <li>• <strong>Edit HTML:</strong> Click into the right pane, paste or type HTML, see markdown update on the left</li>
-            <li>• <strong>Both panes are fully editable</strong> with real-time bidirectional sync</li>
+            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview update instantly on the right</li>
+            <li>• <strong>Edit HTML:</strong> Click into the right pane, type or paste HTML (converts to markdown after 0.5s pause or on blur)</li>
+            <li>• <strong>Both panes are fully editable</strong> with cursor position preserved while typing</li>
             <li>• <strong>Line breaks:</strong> Single line breaks are preserved in both directions</li>
             <li>• <strong>GitHub-flavored markdown:</strong> Tables, task lists, strikethrough, and more</li>
           </ul>
