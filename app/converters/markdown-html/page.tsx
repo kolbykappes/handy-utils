@@ -26,43 +26,46 @@ turndownService.addRule("lineBreak", {
 export default function MarkdownHtmlConverter() {
   const [markdown, setMarkdown] = useState<string>("");
   const [html, setHtml] = useState<string>("");
-  const [htmlViewMode, setHtmlViewMode] = useState<"preview" | "code">("preview");
-  const [lastEdited, setLastEdited] = useState<"markdown" | "html">("markdown");
-  const previewRef = useRef<HTMLDivElement>(null);
+  const htmlPreviewRef = useRef<HTMLDivElement>(null);
 
   // Update HTML when markdown changes
   useEffect(() => {
-    if (lastEdited === "markdown" && markdown) {
-      // Convert markdown to HTML string
-      remark()
-        .use(remarkGfm)
-        .use(remarkBreaks)
-        .use(remarkHtml, { sanitize: false })
-        .process(markdown)
-        .then((file) => {
-          setHtml(String(file));
-        })
-        .catch((err) => {
-          console.error("Failed to convert markdown to HTML:", err);
-        });
-    }
-  }, [markdown, lastEdited]);
+    remark()
+      .use(remarkGfm)
+      .use(remarkBreaks)
+      .use(remarkHtml, { sanitize: false })
+      .process(markdown)
+      .then((file) => {
+        setHtml(String(file));
+      })
+      .catch((err) => {
+        console.error("Failed to convert markdown to HTML:", err);
+      });
+  }, [markdown]);
 
   const handleMarkdownChange = (value: string) => {
     setMarkdown(value);
-    setLastEdited("markdown");
   };
 
-  const handleHtmlChange = (value: string) => {
-    setHtml(value);
-    setLastEdited("html");
+  const handleHtmlPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedHtml = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
 
-    // Convert HTML to markdown
     try {
-      const md = turndownService.turndown(value);
+      const md = turndownService.turndown(pastedHtml);
       setMarkdown(md);
-    } catch (e) {
-      console.error("Failed to convert HTML to markdown:", e);
+    } catch (err) {
+      console.error("Failed to convert HTML to markdown:", err);
+    }
+  };
+
+  const handleHtmlInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const htmlContent = e.currentTarget.innerHTML;
+    try {
+      const md = turndownService.turndown(htmlContent);
+      setMarkdown(md);
+    } catch (err) {
+      console.error("Failed to convert HTML to markdown:", err);
     }
   };
 
@@ -139,34 +142,10 @@ Following up on our conversation today to document your upcoming compensation ch
             </div>
           </div>
 
-          {/* HTML Pane */}
+          {/* HTML Pane - Editable Preview */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-4">
-                <h2 className="text-xl font-bold">HTML</h2>
-                <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
-                  <button
-                    onClick={() => setHtmlViewMode("preview")}
-                    className={`px-3 py-1 rounded text-sm transition-colors ${
-                      htmlViewMode === "preview"
-                        ? "bg-white dark:bg-slate-600 shadow"
-                        : "hover:bg-slate-200 dark:hover:bg-slate-600"
-                    }`}
-                  >
-                    Preview
-                  </button>
-                  <button
-                    onClick={() => setHtmlViewMode("code")}
-                    className={`px-3 py-1 rounded text-sm transition-colors ${
-                      htmlViewMode === "code"
-                        ? "bg-white dark:bg-slate-600 shadow"
-                        : "hover:bg-slate-200 dark:hover:bg-slate-600"
-                    }`}
-                  >
-                    Code
-                  </button>
-                </div>
-              </div>
+              <h2 className="text-xl font-bold">HTML Preview (Editable)</h2>
               <button
                 onClick={handleCopyHtml}
                 className="text-sm bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -175,45 +154,18 @@ Following up on our conversation today to document your upcoming compensation ch
               </button>
             </div>
             <div className="flex-1 p-4 overflow-auto">
-              {htmlViewMode === "preview" ? (
-                <div
-                  ref={previewRef}
-                  className="prose prose-slate dark:prose-invert max-w-none prose-compact"
-                  style={{
-                    lineHeight: '1.4',
-                  }}
-                >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                    rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                    components={{
-                      p: ({node, ...props}) => <p style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                      ul: ({node, ...props}) => <ul style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                      ol: ({node, ...props}) => <ol style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                      li: ({node, ...props}) => <li style={{marginTop: '0.25em', marginBottom: '0.25em'}} {...props} />,
-                      h1: ({node, ...props}) => <h1 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                      h2: ({node, ...props}) => <h2 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                      h3: ({node, ...props}) => <h3 style={{marginTop: '0.5em', marginBottom: '0.5em'}} {...props} />,
-                    }}
-                  >
-                    {markdown}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                <textarea
-                  value={html}
-                  onChange={(e) => handleHtmlChange(e.target.value)}
-                  placeholder="Paste HTML here to convert to Markdown...
-
-<h1>Example</h1>
-<p>Paste any HTML and it will be converted to Markdown.</p>
-<ul>
-  <li>Lists</li>
-  <li><strong>Bold</strong> and <em>italic</em></li>
-</ul>"
-                  className="w-full h-[600px] p-4 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 resize-none"
-                />
-              )}
+              <div
+                ref={htmlPreviewRef}
+                contentEditable
+                onPaste={handleHtmlPaste}
+                onInput={handleHtmlInput}
+                suppressContentEditableWarning
+                className="prose prose-slate dark:prose-invert max-w-none prose-compact min-h-[600px] outline-none p-4 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
+                style={{
+                  lineHeight: '1.4',
+                }}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
             </div>
           </div>
         </div>
@@ -222,11 +174,11 @@ Following up on our conversation today to document your upcoming compensation ch
         <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <h3 className="font-semibold mb-2">✨ How to use:</h3>
           <ul className="text-sm space-y-1 text-slate-700 dark:text-slate-300">
-            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview on the right</li>
-            <li>• <strong>Edit HTML:</strong> Switch to "Code" tab on the right, paste/edit HTML, see markdown on the left</li>
+            <li>• <strong>Edit Markdown:</strong> Type in the left pane, see HTML preview update on the right</li>
+            <li>• <strong>Edit HTML:</strong> Click into the right pane, paste or type HTML, see markdown update on the left</li>
+            <li>• <strong>Both panes are fully editable</strong> with real-time bidirectional sync</li>
             <li>• <strong>Line breaks:</strong> Single line breaks are preserved in both directions</li>
             <li>• <strong>GitHub-flavored markdown:</strong> Tables, task lists, strikethrough, and more</li>
-            <li>• <strong>Copy buttons:</strong> Easy clipboard copying for both formats</li>
           </ul>
         </div>
       </div>
