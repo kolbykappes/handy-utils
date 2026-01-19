@@ -169,25 +169,25 @@ export default function MarkdownHtmlConverter() {
                 onChange={(e) => handleMarkdownChange(e.target.value)}
                 placeholder="Paste or type your Markdown here...
 
-**To:** Harper Kappes
-**From:** Kolby Kappes
-**Subject:** Compensation Update - Salary Transition
+# Sample Document
 
-Harper,
+This is a **simple example** of markdown content.
 
-Following up on our conversation today to document your upcoming compensation change.
+## Features
 
-**Effective Date:** Week of February 2nd, 2026
+- Bullet points
+- *Italic text*
+- **Bold text**
 
-**New Compensation Structure:**
-- Transition from hourly to salaried employee
-- Annual salary: $50,000
-- This represents approximately a $7,000 annual increase from your current rate
+## Code Example
 
-**What This Means:**
-- You'll move from hourly time tracking to salary basis
-- Standard benefits and expectations for salaried employees will apply
-- We have additional compensation increases budgeted for later in 2026 as you continue to take on more responsibility"
+```javascript
+function hello() {
+  console.log('Hello World');
+}
+```
+
+> This is a blockquote"
                 className="w-full h-[700px] p-4 font-mono text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 resize-none"
               />
             </div>
