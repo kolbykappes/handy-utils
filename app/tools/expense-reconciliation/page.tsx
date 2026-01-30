@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { EmployeeExpenses } from "./types";
-import { parseExpenseFile, formatEmailBody } from "./parser";
+import { parseExpenseFile, formatEmailBody, formatLeadershipSummary } from "./parser";
 
 export default function ExpenseReconciliation() {
   const [employeeData, setEmployeeData] = useState<EmployeeExpenses[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [headerText, setHeaderText] = useState<string>("Please submit these expenses by [DATE].");
+  const [viewMode, setViewMode] = useState<"individual" | "leadership">("individual");
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -45,8 +47,13 @@ export default function ExpenseReconciliation() {
     const employee = employeeData.find((e) => e.name === selectedEmployee);
     if (!employee) return;
 
-    const emailBody = formatEmailBody(employee.name, employee.missingExpenses);
+    const emailBody = formatEmailBody(employee.name, employee.missingExpenses, headerText);
     navigator.clipboard.writeText(emailBody);
+  };
+
+  const handleCopyLeadershipSummary = () => {
+    const summary = formatLeadershipSummary(employeeData);
+    navigator.clipboard.writeText(summary);
   };
 
   const selectedEmployeeData = employeeData.find(
@@ -71,10 +78,10 @@ export default function ExpenseReconciliation() {
           </p>
         </div>
 
-        {/* File Upload */}
+        {/* File Upload and Settings */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 mb-6 border border-slate-200 dark:border-slate-700">
           <h2 className="text-xl font-bold mb-4">Upload Spreadsheet</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mb-4">
             <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors inline-block">
               <input
                 type="file"
@@ -90,6 +97,21 @@ export default function ExpenseReconciliation() {
               </span>
             )}
           </div>
+
+          {/* Header Text Input */}
+          <div className="mt-4">
+            <label className="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+              Email Header Text (prepended to each employee email):
+            </label>
+            <textarea
+              value={headerText}
+              onChange={(e) => setHeaderText(e.target.value)}
+              placeholder="e.g., Please submit these expenses by [DATE]."
+              className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              rows={2}
+            />
+          </div>
+
           {error && (
             <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
               {error}
@@ -98,30 +120,56 @@ export default function ExpenseReconciliation() {
         </div>
 
         {employeeData.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Employee Selection */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
-              <h2 className="text-xl font-bold mb-4">Employees with Missing Expenses</h2>
-              <div className="space-y-2">
-                {employeeData.map((employee) => (
-                  <button
-                    key={employee.name}
-                    onClick={() => setSelectedEmployee(employee.name)}
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                      selectedEmployee === employee.name
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
-                    }`}
-                  >
-                    <div className="font-semibold">{employee.name}</div>
-                    <div className="text-sm opacity-80">
-                      {employee.missingExpenses.length} missing expense
-                      {employee.missingExpenses.length !== 1 ? "s" : ""}
-                    </div>
-                  </button>
-                ))}
-              </div>
+          <>
+            {/* View Mode Toggle */}
+            <div className="mb-4 flex gap-2">
+              <button
+                onClick={() => setViewMode("individual")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === "individual"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600"
+                }`}
+              >
+                👤 Individual Emails
+              </button>
+              <button
+                onClick={() => setViewMode("leadership")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === "leadership"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600"
+                }`}
+              >
+                📊 Leadership Summary
+              </button>
             </div>
+
+            {viewMode === "individual" ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Employee Selection */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
+                  <h2 className="text-xl font-bold mb-4">Employees with Missing Expenses</h2>
+                  <div className="space-y-2">
+                    {employeeData.map((employee) => (
+                      <button
+                        key={employee.name}
+                        onClick={() => setSelectedEmployee(employee.name)}
+                        className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                          selectedEmployee === employee.name
+                            ? "bg-blue-600 text-white"
+                            : "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+                        }`}
+                      >
+                        <div className="font-semibold">{employee.name}</div>
+                        <div className="text-sm opacity-80">
+                          {employee.missingExpenses.length} missing expense
+                          {employee.missingExpenses.length !== 1 ? "s" : ""}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
             {/* Email Body Preview */}
             <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col">
@@ -155,7 +203,8 @@ export default function ExpenseReconciliation() {
                     <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 font-mono text-sm whitespace-pre-wrap">
                       {formatEmailBody(
                         selectedEmployeeData.name,
-                        selectedEmployeeData.missingExpenses
+                        selectedEmployeeData.missingExpenses,
+                        headerText
                       )}
                     </div>
 
@@ -202,6 +251,26 @@ export default function ExpenseReconciliation() {
               </div>
             </div>
           </div>
+            ) : (
+              /* Leadership Summary View */
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col">
+                <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+                  <h2 className="text-xl font-bold">Leadership Summary</h2>
+                  <button
+                    onClick={handleCopyLeadershipSummary}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    📋 Copy Summary
+                  </button>
+                </div>
+                <div className="p-6">
+                  <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-lg border border-slate-200 dark:border-slate-700 font-mono text-sm whitespace-pre-wrap">
+                    {formatLeadershipSummary(employeeData)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {!loading && employeeData.length === 0 && !error && (

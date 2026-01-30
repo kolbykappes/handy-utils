@@ -151,12 +151,23 @@ export function parseExpenseFile(file: File): Promise<EmployeeExpenses[]> {
   });
 }
 
-export function formatEmailBody(employeeName: string, expenses: ExpenseRow[]): string {
+export function formatEmailBody(
+  employeeName: string,
+  expenses: ExpenseRow[],
+  headerText: string = ""
+): string {
   if (expenses.length === 0) {
     return `${employeeName} has no missing expenses.`;
   }
 
-  let emailBody = `${employeeName}'s missing expenses:\n\n`;
+  let emailBody = "";
+
+  // Add header text if provided
+  if (headerText.trim()) {
+    emailBody += `${headerText.trim()}\n\n`;
+  }
+
+  emailBody += `${employeeName}'s missing expenses:\n\n`;
 
   expenses.forEach((expense, index) => {
     emailBody += `${index + 1}. ${expense.date} - ${expense.description} - $${expense.amount.toFixed(2)}\n`;
@@ -167,4 +178,46 @@ export function formatEmailBody(employeeName: string, expenses: ExpenseRow[]): s
   });
 
   return emailBody;
+}
+
+export function formatLeadershipSummary(employeeData: EmployeeExpenses[]): string {
+  if (employeeData.length === 0) {
+    return "No missing expenses found.";
+  }
+
+  let summary = "Missing Expense Summary\n\n";
+
+  // Calculate totals
+  const totalExpenses = employeeData.reduce(
+    (sum, emp) => sum + emp.missingExpenses.length,
+    0
+  );
+  const totalAmount = employeeData.reduce(
+    (sum, emp) =>
+      sum + emp.missingExpenses.reduce((expSum, exp) => expSum + exp.amount, 0),
+    0
+  );
+
+  summary += `Overall Totals:\n`;
+  summary += `Total Missing Expenses: ${totalExpenses}\n`;
+  summary += `Total Amount: $${totalAmount.toFixed(2)}\n\n`;
+
+  // Create table header
+  summary += `Employee Name          | Missing Expenses | Total Amount\n`;
+  summary += `${"─".repeat(23)}|${"─".repeat(18)}|${"─".repeat(15)}\n`;
+
+  // Add employee rows
+  employeeData.forEach((employee) => {
+    const empTotal = employee.missingExpenses.reduce(
+      (sum, exp) => sum + exp.amount,
+      0
+    );
+    const namePadded = employee.name.padEnd(22);
+    const countPadded = employee.missingExpenses.length.toString().padStart(16);
+    const amountPadded = `$${empTotal.toFixed(2)}`.padStart(14);
+
+    summary += `${namePadded} | ${countPadded} | ${amountPadded}\n`;
+  });
+
+  return summary;
 }
