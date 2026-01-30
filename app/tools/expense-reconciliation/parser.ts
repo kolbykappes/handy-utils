@@ -185,7 +185,38 @@ export function formatLeadershipSummary(employeeData: EmployeeExpenses[]): strin
     return "No missing expenses found.";
   }
 
-  let summary = "Missing Expense Summary\n\n";
+  // Detect date range from all expenses
+  let minDate: Date | null = null;
+  let maxDate: Date | null = null;
+
+  employeeData.forEach((employee) => {
+    employee.missingExpenses.forEach((expense) => {
+      if (expense.date) {
+        try {
+          const expenseDate = new Date(expense.date);
+          if (!isNaN(expenseDate.getTime())) {
+            if (!minDate || expenseDate < minDate) {
+              minDate = expenseDate;
+            }
+            if (!maxDate || expenseDate > maxDate) {
+              maxDate = expenseDate;
+            }
+          }
+        } catch (e) {
+          // Ignore invalid dates
+        }
+      }
+    });
+  });
+
+  let dateRangeStr = "";
+  if (minDate !== null && maxDate !== null) {
+    const minDateObj: Date = minDate;
+    const maxDateObj: Date = maxDate;
+    dateRangeStr = `\nDate Range: ${minDateObj.toLocaleDateString()} - ${maxDateObj.toLocaleDateString()}`;
+  }
+
+  let summary = `Missing Expense Summary${dateRangeStr}\n\n`;
 
   // Calculate totals
   const totalExpenses = employeeData.reduce(
