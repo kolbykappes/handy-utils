@@ -20,6 +20,12 @@ export default function Home() {
       href: "/converters/markdown-html",
       icon: "🔄",
     },
+    {
+      name: "Expense Reconciliation",
+      description: "Upload AmEx reconciliation spreadsheet to generate missing expense emails",
+      href: "/tools/expense-reconciliation",
+      icon: "💳",
+    },
   ];
 
   return (
