@@ -18,8 +18,13 @@ export async function fetchWeatherData(
     const dateStr = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD format
 
     try {
+      // Format zip code for US locations (WeatherAPI prefers "US zipcode" format)
+      const locationQuery = /^\d{5}$/.test(job.zipCode)
+        ? `US ${job.zipCode}`
+        : job.zipCode;
+
       const response = await fetch(
-        `${WEATHER_API_BASE}?key=${apiKey}&q=${job.zipCode}&dt=${dateStr}`
+        `${WEATHER_API_BASE}?key=${apiKey}&q=${encodeURIComponent(locationQuery)}&dt=${dateStr}`
       );
 
       if (!response.ok) {

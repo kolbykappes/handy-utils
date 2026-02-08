@@ -27,6 +27,14 @@ export default function WeatherDays() {
 
     const savedJobs = localStorage.getItem("weatherJobs");
     if (savedJobs) setJobs(JSON.parse(savedJobs));
+
+    // Set default date range to previous 7 days
+    const today = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    setEndDate(today.toISOString().split("T")[0]);
+    setStartDate(sevenDaysAgo.toISOString().split("T")[0]);
   }, []);
 
   // Save API key to localStorage
