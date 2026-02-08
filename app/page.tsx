@@ -26,6 +26,12 @@ export default function Home() {
       href: "/tools/expense-reconciliation",
       icon: "💳",
     },
+    {
+      name: "Weather Days for Job Sites",
+      description: "Track historical weather data (temps and precipitation) for job sites",
+      href: "/tools/weather-days",
+      icon: "🌤️",
+    },
   ];
 
   return (
