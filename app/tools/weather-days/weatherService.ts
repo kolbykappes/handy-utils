@@ -23,7 +23,17 @@ export async function fetchWeatherData(
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch weather for ${dateStr}: ${response.statusText}`);
+        // Parse the API error body for a real message
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+        } catch {
+          // Ignore JSON parse failure, use status code
+        }
+        throw new Error(`${dateStr}: ${errorMessage}`);
       }
 
       const data = await response.json();
