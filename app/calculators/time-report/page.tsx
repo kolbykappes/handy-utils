@@ -13,14 +13,26 @@ function formatNumber(num: number, decimals: number = 2): string {
   });
 }
 
+function getPreviousMonthRange(): { start: string; end: string } {
+  const today = new Date();
+  const firstOfThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const firstOfPrevMonth = new Date(firstOfThisMonth.getFullYear(), firstOfThisMonth.getMonth() - 1, 1);
+  const lastOfPrevMonth = new Date(firstOfThisMonth.getTime() - 86400000); // day before first of this month
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+  return { start: fmt(firstOfPrevMonth), end: fmt(lastOfPrevMonth) };
+}
+
 export default function TimeReportGenerator() {
-  const [startDate, setStartDate] = useState<string>("2025-11-10");
-  const [endDate, setEndDate] = useState<string>("2026-01-15");
+  const prevMonth = getPreviousMonthRange();
+  const [startDate, setStartDate] = useState<string>(prevMonth.start);
+  const [endDate, setEndDate] = useState<string>(prevMonth.end);
   const [withholdingRate, setWithholdingRate] = useState<string>("27.5");
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [generating, setGenerating] = useState<boolean>(false);
   const [employees, setEmployees] = useState<Employee[]>(EMPLOYEES);
+  const [customHolidays, setCustomHolidays] = useState<string[]>([]);
+  const [newHoliday, setNewHoliday] = useState<string>("");
 
   // Load custom employees from localStorage on mount
   useEffect(() => {
@@ -33,7 +45,30 @@ export default function TimeReportGenerator() {
         setEmployees(EMPLOYEES);
       }
     }
+    const savedHolidays = localStorage.getItem("customHolidays");
+    if (savedHolidays) {
+      try {
+        setCustomHolidays(JSON.parse(savedHolidays));
+      } catch (e) {
+        // ignore
+      }
+    }
   }, []);
+
+  const handleAddHoliday = () => {
+    if (!newHoliday) return;
+    if (customHolidays.includes(newHoliday)) return;
+    const updated = [...customHolidays, newHoliday].sort();
+    setCustomHolidays(updated);
+    localStorage.setItem("customHolidays", JSON.stringify(updated));
+    setNewHoliday("");
+  };
+
+  const handleRemoveHoliday = (date: string) => {
+    const updated = customHolidays.filter((d) => d !== date);
+    setCustomHolidays(updated);
+    localStorage.setItem("customHolidays", JSON.stringify(updated));
+  };
 
   const handleGenerate = (e: FormEvent) => {
     e.preventDefault();
@@ -61,6 +96,7 @@ export default function TimeReportGenerator() {
         startDate: start,
         endDate: end,
         witholdingRate: rate,
+        customHolidays,
       });
 
       setEntries(generated);
@@ -198,6 +234,39 @@ export default function TimeReportGenerator() {
                 />
               </div>
 
+              {/* Custom Holidays */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Additional Holidays
+                  <span className="ml-1 text-xs text-slate-500">(excluded from report)</span>
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    type="date"
+                    value={newHoliday}
+                    onChange={(e) => setNewHoliday(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddHoliday}
+                    className="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+                {customHolidays.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {customHolidays.map((d) => (
+                      <div key={d} className="flex justify-between items-center text-xs px-2 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded">
+                        <span>{new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</span>
+                        <button type="button" onClick={() => handleRemoveHoliday(d)} className="text-red-500 hover:text-red-700 ml-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {error && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
                   {error}
@@ -248,10 +317,14 @@ export default function TimeReportGenerator() {
                 </Link>
               </div>
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {employees.map((emp) => (
+                {[...employees].sort((a, b) => a.name.localeCompare(b.name)).map((emp) => (
                   <div
                     key={emp.name}
-                    className="flex justify-between items-center text-xs p-2 bg-slate-50 dark:bg-slate-700/50 rounded"
+                    className={`flex justify-between items-center text-xs p-2 rounded ${
+                      emp.disabled
+                        ? "bg-slate-100 dark:bg-slate-800 opacity-40 line-through"
+                        : "bg-slate-50 dark:bg-slate-700/50"
+                    }`}
                   >
                     <span className="font-medium">{emp.name}</span>
                     <span className="text-slate-600 dark:text-slate-400">
