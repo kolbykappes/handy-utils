@@ -8,6 +8,9 @@ import { Employee } from "../types";
 export default function EmployeeEditor() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  // Tracks the raw string being typed in each rate field (keyed by array index)
+  // so the input doesn't snap to 0 when you clear it mid-edit.
+  const [rateInputs, setRateInputs] = useState<Record<number, string>>({});
 
   // Load custom employees from localStorage or use defaults
   useEffect(() => {
@@ -52,14 +55,14 @@ export default function EmployeeEditor() {
 
   const addEmployee = () => {
     const newEmployee: Employee = {
-      name: "New Employee",
+      name: "",
       hourlyRate: 20.0,
       role: "General Labor",
       workProbability: 0.8,
       minHours: 8.0,
       maxHours: 10.0,
     };
-    setEmployees([...employees, newEmployee]);
+    setEmployees([newEmployee, ...employees]);
     setHasChanges(true);
   };
 
@@ -212,14 +215,24 @@ export default function EmployeeEditor() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={employee.hourlyRate}
+                    value={rateInputs[index] ?? employee.hourlyRate}
                     onChange={(e) =>
-                      updateEmployee(
-                        index,
-                        "hourlyRate",
-                        parseFloat(e.target.value) || 0
-                      )
+                      setRateInputs((prev) => ({
+                        ...prev,
+                        [index]: e.target.value,
+                      }))
                     }
+                    onBlur={(e) => {
+                      const parsed = parseFloat(e.target.value);
+                      if (!isNaN(parsed) && parsed >= 0) {
+                        updateEmployee(index, "hourlyRate", parsed);
+                      }
+                      setRateInputs((prev) => {
+                        const next = { ...prev };
+                        delete next[index];
+                        return next;
+                      });
+                    }}
                     className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-700"
                   />
                 </div>
