@@ -27,7 +27,6 @@ export default function EmployeeEditor() {
   const handleSave = () => {
     localStorage.setItem("customEmployees", JSON.stringify(employees));
     setHasChanges(false);
-    alert("Employee settings saved successfully!");
   };
 
   const handleReset = () => {
@@ -36,6 +35,12 @@ export default function EmployeeEditor() {
       localStorage.removeItem("customEmployees");
       setHasChanges(false);
     }
+  };
+
+  const handleSortAlpha = () => {
+    const sorted = [...employees].sort((a, b) => a.name.localeCompare(b.name));
+    setEmployees(sorted);
+    setHasChanges(true);
   };
 
   const updateEmployee = (index: number, field: keyof Employee, value: any) => {
@@ -113,6 +118,12 @@ export default function EmployeeEditor() {
           >
             ➕ Add Employee
           </button>
+          <button
+            onClick={handleSortAlpha}
+            className="bg-slate-600 hover:bg-slate-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+          >
+            🔤 Sort A–Z
+          </button>
         </div>
 
         {hasChanges && (
@@ -125,16 +136,40 @@ export default function EmployeeEditor() {
           {employees.map((employee, index) => (
             <div
               key={index}
-              className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700"
+              className={`bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border transition-opacity ${
+                employee.disabled
+                  ? "border-slate-200 dark:border-slate-700 opacity-50"
+                  : "border-slate-200 dark:border-slate-700"
+              }`}
             >
               <div className="flex items-start justify-between mb-4">
-                <h3 className="text-xl font-bold">{employee.name}</h3>
-                <button
-                  onClick={() => removeEmployee(index)}
-                  className="text-red-600 dark:text-red-400 hover:underline text-sm"
-                >
-                  Remove
-                </button>
+                <div className="flex items-center gap-3">
+                  <h3 className={`text-xl font-bold ${employee.disabled ? "line-through text-slate-400" : ""}`}>
+                    {employee.name}
+                  </h3>
+                  {employee.disabled && (
+                    <span className="text-xs bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">
+                      Disabled
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!employee.disabled}
+                      onChange={(e) => updateEmployee(index, "disabled", !e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span>Active</span>
+                  </label>
+                  <button
+                    onClick={() => removeEmployee(index)}
+                    className="text-red-600 dark:text-red-400 hover:underline text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

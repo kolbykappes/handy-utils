@@ -8,6 +8,7 @@ export interface Employee {
   isPartTime?: boolean;
   weeklyHourLimit?: number;
   weeklyDayLimit?: number;
+  disabled?: boolean;
 }
 
 export interface TimeEntry {
@@ -24,4 +25,5 @@ export interface GenerationOptions {
   startDate: Date;
   endDate: Date;
   witholdingRate: number;
+  customHolidays?: string[]; // Array of YYYY-MM-DD date strings
 }

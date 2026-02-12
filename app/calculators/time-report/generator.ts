@@ -16,18 +16,23 @@ function isSunday(date: Date): boolean {
 }
 
 // Helper function to check if a date is a holiday
-function isHoliday(date: Date): boolean {
-  return HOLIDAYS_2025_2026.some(
+function isHoliday(date: Date, customHolidays: string[] = []): boolean {
+  const builtIn = HOLIDAYS_2025_2026.some(
     (holiday) =>
       holiday.getFullYear() === date.getFullYear() &&
       holiday.getMonth() === date.getMonth() &&
       holiday.getDate() === date.getDate()
   );
+  if (builtIn) return true;
+
+  // Check custom holidays (YYYY-MM-DD strings)
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return customHolidays.includes(dateStr);
 }
 
 // Helper function to check if a date is a work day
-function isWorkDay(date: Date): boolean {
-  return !isSunday(date) && !isHoliday(date);
+function isWorkDay(date: Date, customHolidays: string[] = []): boolean {
+  return !isSunday(date) && !isHoliday(date, customHolidays);
 }
 
 // Helper function to round hours to nearest 0.25
@@ -72,13 +77,17 @@ export function generateTimeReport(
   const weeklyHours = new Map<string, Map<string, number>>(); // week -> employee -> hours
   const weeklyDays = new Map<string, Map<string, number>>(); // week -> employee -> days worked
 
+  const customHolidays = options.customHolidays || [];
+  // Only include enabled employees
+  const activeEmployees = employees.filter((e) => !e.disabled);
+
   // Iterate through each day in the range
   const currentDate = new Date(options.startDate);
   const endDate = new Date(options.endDate);
 
   while (currentDate <= endDate) {
     // Skip non-work days
-    if (!isWorkDay(currentDate)) {
+    if (!isWorkDay(currentDate, customHolidays)) {
       currentDate.setDate(currentDate.getDate() + 1);
       continue;
     }
@@ -87,7 +96,7 @@ export function generateTimeReport(
     const weekStart = getWeekStart(currentDate);
 
     // Process each employee
-    for (const employee of employees) {
+    for (const employee of activeEmployees) {
       // Initialize weekly tracking for this week if needed
       if (!weeklyHours.has(weekStart)) {
         weeklyHours.set(weekStart, new Map());
