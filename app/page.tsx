@@ -7,30 +7,40 @@ export default function Home() {
       description: "Calculate interest rate, monthly payment, principal, or loan term",
       href: "/calculators/interest-rate",
       icon: "💰",
+      version: "1.2",
+      updatedAt: "2026-01-17",
     },
     {
       name: "Time Report Generator",
       description: "Generate sample labor cost datasets for payroll testing",
       href: "/calculators/time-report",
       icon: "📊",
+      version: "1.3",
+      updatedAt: "2026-02-12",
     },
     {
       name: "Markdown ↔ HTML Converter",
       description: "Bidirectional converter with live sync and GitHub-flavored markdown",
       href: "/converters/markdown-html",
       icon: "🔄",
+      version: "1.6",
+      updatedAt: "2026-01-19",
     },
     {
       name: "Expense Reconciliation",
       description: "Upload AmEx reconciliation spreadsheet to generate missing expense emails",
       href: "/tools/expense-reconciliation",
       icon: "💳",
+      version: "1.3",
+      updatedAt: "2026-01-30",
     },
     {
       name: "Weather Days for Job Sites",
       description: "Track historical weather data (temps and precipitation) for job sites",
       href: "/tools/weather-days",
       icon: "🌤️",
+      version: "1.2",
+      updatedAt: "2026-02-08",
     },
   ];
 
@@ -56,11 +66,19 @@ export default function Home() {
               <div className="flex items-start gap-4">
                 <div className="text-4xl">{calculator.icon}</div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-semibold mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {calculator.name}
-                  </h2>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {calculator.name}
+                    </h2>
+                    <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                      v{calculator.version}
+                    </span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
                     {calculator.description}
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    Updated {new Date(calculator.updatedAt + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                   </p>
                 </div>
               </div>
