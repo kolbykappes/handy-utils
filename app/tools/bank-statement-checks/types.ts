@@ -11,6 +11,7 @@ export interface CheckImageOCR {
   payee: string;
   memo: string;
   confidence: number;
+  rawText: string;
   imageDataUrl?: string;
 }
 

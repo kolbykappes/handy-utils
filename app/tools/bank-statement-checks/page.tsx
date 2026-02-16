@@ -21,7 +21,7 @@ export default function BankStatementChecks() {
   const [filterNeedsReview, setFilterNeedsReview] = useState(false);
   const [sortField, setSortField] = useState<"checkNumber" | "date" | "amount">("checkNumber");
   const [sortAsc, setSortAsc] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedCheck, setSelectedCheck] = useState<{ image: string; rawText: string; checkNumber: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
 
@@ -65,7 +65,7 @@ export default function BankStatementChecks() {
       });
       await initOCR();
 
-      const ocrResults = new Map<string, { payee: string; memo: string; confidence: number; imageDataUrl?: string }>();
+      const ocrResults = new Map<string, { payee: string; memo: string; confidence: number; rawText: string; imageDataUrl?: string }>();
 
       for (let i = 0; i < checkImages.length; i++) {
         if (abortRef.current) break;
@@ -86,6 +86,7 @@ export default function BankStatementChecks() {
           payee: result.payee,
           memo: result.memo,
           confidence: result.confidence,
+          rawText: result.rawText,
           imageDataUrl: result.imageDataUrl,
         });
       }
@@ -107,7 +108,8 @@ export default function BankStatementChecks() {
           hasOCR: !!ocr,
           needsReview: !ocr || (ocr.confidence < 70) || !ocr.payee,
           imageDataUrl: ocr?.imageDataUrl,
-        } as CheckRecord & { imageDataUrl?: string };
+          rawOcrText: ocr?.rawText || "",
+        } as CheckRecord & { imageDataUrl?: string; rawOcrText?: string };
       });
 
       setCheckRecords(records);
@@ -451,11 +453,14 @@ export default function BankStatementChecks() {
                           <td className="px-4 py-2.5 text-center">
                             {(record as CheckRecord & { imageDataUrl?: string }).imageDataUrl ? (
                               <button
-                                onClick={() =>
-                                  setSelectedImage(
-                                    (record as CheckRecord & { imageDataUrl?: string }).imageDataUrl || null
-                                  )
-                                }
+                                onClick={() => {
+                                  const r = record as CheckRecord & { imageDataUrl?: string; rawOcrText?: string };
+                                  setSelectedCheck({
+                                    image: r.imageDataUrl || "",
+                                    rawText: r.rawOcrText || "",
+                                    checkNumber: r.checkNumber,
+                                  });
+                                }}
                                 className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
                               >
                                 View
@@ -480,32 +485,42 @@ export default function BankStatementChecks() {
           </>
         )}
 
-        {/* Image Modal */}
-        {selectedImage && (
+        {/* Image + OCR Debug Modal */}
+        {selectedCheck && (
           <div
             className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-            onClick={() => setSelectedImage(null)}
+            onClick={() => setSelectedCheck(null)}
           >
             <div
-              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 max-w-2xl max-h-[90vh] overflow-auto"
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 max-w-3xl w-full max-h-[90vh] overflow-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                  Check Image
+                  Check #{selectedCheck.checkNumber}
                 </h3>
                 <button
-                  onClick={() => setSelectedImage(null)}
+                  onClick={() => setSelectedCheck(null)}
                   className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl"
                 >
                   &times;
                 </button>
               </div>
               <img
-                src={selectedImage}
-                alt="Check image"
-                className="w-full rounded border border-slate-200 dark:border-slate-600"
+                src={selectedCheck.image}
+                alt={`Check #${selectedCheck.checkNumber}`}
+                className="w-full rounded border border-slate-200 dark:border-slate-600 mb-4"
               />
+              {selectedCheck.rawText && (
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Raw OCR Text
+                  </h4>
+                  <pre className="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-3 whitespace-pre-wrap font-mono text-slate-700 dark:text-slate-300 max-h-48 overflow-auto">
+                    {selectedCheck.rawText}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
         )}
