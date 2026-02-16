@@ -8,7 +8,7 @@ export default function Home() {
       href: "/calculators/interest-rate",
       icon: "💰",
       version: "1.2",
-      updatedAt: "2026-01-17",
+      updatedAt: "2026-01-17T21:06:00Z",
     },
     {
       name: "Time Report Generator",
@@ -16,7 +16,7 @@ export default function Home() {
       href: "/calculators/time-report",
       icon: "📊",
       version: "1.3",
-      updatedAt: "2026-02-12",
+      updatedAt: "2026-02-12T19:36:00Z",
     },
     {
       name: "Markdown ↔ HTML Converter",
@@ -24,7 +24,7 @@ export default function Home() {
       href: "/converters/markdown-html",
       icon: "🔄",
       version: "1.6",
-      updatedAt: "2026-01-19",
+      updatedAt: "2026-01-19T21:53:00Z",
     },
     {
       name: "Expense Reconciliation",
@@ -32,7 +32,7 @@ export default function Home() {
       href: "/tools/expense-reconciliation",
       icon: "💳",
       version: "1.3",
-      updatedAt: "2026-01-30",
+      updatedAt: "2026-01-30T18:38:00Z",
     },
     {
       name: "Weather Days for Job Sites",
@@ -40,7 +40,7 @@ export default function Home() {
       href: "/tools/weather-days",
       icon: "🌤️",
       version: "1.2",
-      updatedAt: "2026-02-08",
+      updatedAt: "2026-02-08T19:58:00Z",
     },
     {
       name: "Bank Statement Check Parser",
@@ -48,7 +48,7 @@ export default function Home() {
       href: "/tools/bank-statement-checks",
       icon: "🏦",
       version: "1.0",
-      updatedAt: "2026-02-16",
+      updatedAt: "2026-02-16T19:43:00Z",
     },
   ];
 
@@ -86,7 +86,7 @@ export default function Home() {
                     {calculator.description}
                   </p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">
-                    Updated {new Date(calculator.updatedAt + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                    Updated {new Date(calculator.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })} at {new Date(calculator.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                   </p>
                 </div>
               </div>
