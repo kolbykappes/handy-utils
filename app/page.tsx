@@ -42,6 +42,14 @@ export default function Home() {
       version: "1.2",
       updatedAt: "2026-02-08",
     },
+    {
+      name: "Bank Statement Check Parser",
+      description: "Parse check data from bank statement PDFs with OCR for payee and memo",
+      href: "/tools/bank-statement-checks",
+      icon: "🏦",
+      version: "1.0",
+      updatedAt: "2026-02-16",
+    },
   ];
 
   return (

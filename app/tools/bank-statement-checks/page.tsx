@@ -1,0 +1,522 @@
+"use client";
+
+import { useState, useRef, useCallback } from "react";
+import Link from "next/link";
+import type { CheckRecord, ProcessingStatus } from "./types";
+import { extractCheckTransactions, extractCheckImages } from "./pdf-parser";
+import { initOCR, ocrCheckImage, terminateOCR } from "./ocr-engine";
+import { downloadCheckExcel } from "./export";
+
+export default function BankStatementChecks() {
+  const [status, setStatus] = useState<ProcessingStatus>({
+    stage: "idle",
+    message: "",
+  });
+  const [checkRecords, setCheckRecords] = useState<CheckRecord[]>([]);
+  const [editingCell, setEditingCell] = useState<{
+    row: number;
+    field: "payee" | "memo";
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [filterNeedsReview, setFilterNeedsReview] = useState(false);
+  const [sortField, setSortField] = useState<"checkNumber" | "date" | "amount">("checkNumber");
+  const [sortAsc, setSortAsc] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef(false);
+
+  const processStatement = useCallback(async (file: File) => {
+    setError(null);
+    setCheckRecords([]);
+    abortRef.current = false;
+
+    try {
+      // Step 1: Extract text-based check transactions
+      setStatus({
+        stage: "extracting-text",
+        message: "Loading PDF and extracting check data...",
+      });
+      const { transactions, pdfDoc } = await extractCheckTransactions(file);
+
+      if (transactions.length === 0) {
+        setError("No check transactions found in this PDF. Make sure it is a bank statement with check listings.");
+        setStatus({ stage: "error", message: "No checks found" });
+        return;
+      }
+
+      // Step 2: Extract check images
+      setStatus({
+        stage: "rendering-pages",
+        message: "Rendering check image pages...",
+      });
+      const checkImages = await extractCheckImages(pdfDoc, (current, total) => {
+        setStatus({
+          stage: "rendering-pages",
+          currentCheck: current,
+          totalChecks: total,
+          message: `Extracting check images: ${current} of ${total}`,
+        });
+      });
+
+      // Step 3: OCR each check image
+      setStatus({
+        stage: "ocr-processing",
+        message: "Initializing OCR engine...",
+      });
+      await initOCR();
+
+      const ocrResults = new Map<string, { payee: string; memo: string; confidence: number; imageDataUrl?: string }>();
+
+      for (let i = 0; i < checkImages.length; i++) {
+        if (abortRef.current) break;
+
+        setStatus({
+          stage: "ocr-processing",
+          currentCheck: i + 1,
+          totalChecks: checkImages.length,
+          message: `OCR processing check ${i + 1} of ${checkImages.length} (Check #${checkImages[i].checkNumber})`,
+        });
+
+        const result = await ocrCheckImage(
+          checkImages[i].imageDataUrl,
+          checkImages[i].checkNumber
+        );
+
+        ocrResults.set(result.checkNumber, {
+          payee: result.payee,
+          memo: result.memo,
+          confidence: result.confidence,
+          imageDataUrl: result.imageDataUrl,
+        });
+      }
+
+      await terminateOCR();
+
+      // Step 4: Correlate text transactions with OCR results
+      setStatus({ stage: "correlating", message: "Matching OCR results..." });
+
+      const records: CheckRecord[] = transactions.map((t) => {
+        const ocr = ocrResults.get(t.checkNumber);
+        return {
+          checkNumber: t.checkNumber,
+          date: t.date,
+          amount: t.amount,
+          payee: ocr?.payee || "",
+          memo: ocr?.memo || "",
+          ocrConfidence: ocr?.confidence || 0,
+          hasOCR: !!ocr,
+          needsReview: !ocr || (ocr.confidence < 70) || !ocr.payee,
+          imageDataUrl: ocr?.imageDataUrl,
+        } as CheckRecord & { imageDataUrl?: string };
+      });
+
+      setCheckRecords(records);
+      setStatus({
+        stage: "done",
+        message: `Processed ${records.length} checks. ${records.filter((r) => r.needsReview).length} need review.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Processing failed";
+      setError(msg);
+      setStatus({ stage: "error", message: msg });
+      await terminateOCR().catch(() => {});
+    }
+  }, []);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Please upload a PDF file.");
+      return;
+    }
+    processStatement(file);
+  };
+
+  const handleCellEdit = (index: number, field: "payee" | "memo", value: string) => {
+    setCheckRecords((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      // If payee was filled in, may no longer need review
+      if (field === "payee" && value.trim()) {
+        updated[index].needsReview = false;
+      }
+      return updated;
+    });
+    setEditingCell(null);
+  };
+
+  const handleSort = (field: "checkNumber" | "date" | "amount") => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  };
+
+  const sortedRecords = [...checkRecords]
+    .filter((r) => !filterNeedsReview || r.needsReview)
+    .sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "checkNumber") {
+        cmp = parseInt(a.checkNumber) - parseInt(b.checkNumber);
+      } else if (sortField === "date") {
+        cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else {
+        cmp = a.amount - b.amount;
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+
+  const totalAmount = checkRecords.reduce((sum, r) => sum + r.amount, 0);
+  const needsReviewCount = checkRecords.filter((r) => r.needsReview).length;
+
+  const handleExport = () => {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadCheckExcel(checkRecords, `check-register-${dateStr}.xlsx`);
+  };
+
+  const progressPercent =
+    status.totalChecks && status.currentCheck
+      ? Math.round((status.currentCheck / status.totalChecks) * 100)
+      : 0;
+
+  const isProcessing = !["idle", "done", "error"].includes(status.stage);
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortField !== field) return <span className="text-slate-400 ml-1">↕</span>;
+    return <span className="ml-1">{sortAsc ? "↑" : "↓"}</span>;
+  };
+
+  return (
+    <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="max-w-[1600px] mx-auto">
+        <Link
+          href="/"
+          className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2 text-sm mb-4"
+        >
+          ← Back to Home
+        </Link>
+
+        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          Bank Statement Check Parser
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
+          Upload a bank statement PDF to extract check data with OCR for payee and memo fields
+        </p>
+
+        {/* Upload Card */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700 mb-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileUpload}
+              disabled={isProcessing}
+              className="block text-sm text-slate-500 dark:text-slate-400
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-lg file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                dark:file:bg-blue-900/30 dark:file:text-blue-400
+                hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50
+                file:cursor-pointer disabled:opacity-50"
+            />
+            {isProcessing && (
+              <button
+                onClick={() => { abortRef.current = true; }}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          {/* Progress */}
+          {isProcessing && (
+            <div className="mt-4">
+              <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400 mb-1">
+                <span>{status.message}</span>
+                {status.totalChecks ? <span>{progressPercent}%</span> : null}
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: status.stage === "extracting-text"
+                      ? "10%"
+                      : status.stage === "rendering-pages"
+                      ? `${10 + progressPercent * 0.2}%`
+                      : status.stage === "ocr-processing"
+                      ? `${30 + progressPercent * 0.65}%`
+                      : status.stage === "correlating"
+                      ? "98%"
+                      : "0%",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Results */}
+        {checkRecords.length > 0 && (
+          <>
+            {/* Summary Bar */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-4 border border-slate-200 dark:border-slate-700 mb-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-6">
+                  <div>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Total Checks</span>
+                    <p className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                      {checkRecords.length}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Total Amount</span>
+                    <p className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                      ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Needs Review</span>
+                    <p className={`text-xl font-bold ${needsReviewCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}>
+                      {needsReviewCount}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filterNeedsReview}
+                      onChange={(e) => setFilterNeedsReview(e.target.checked)}
+                      className="rounded border-slate-300 dark:border-slate-600"
+                    />
+                    Show only needs review
+                  </label>
+                  <button
+                    onClick={handleExport}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Export to Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-600">
+                      <th
+                        className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600/50"
+                        onClick={() => handleSort("checkNumber")}
+                      >
+                        Check # <SortIcon field="checkNumber" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600/50"
+                        onClick={() => handleSort("date")}
+                      >
+                        Date <SortIcon field="date" />
+                      </th>
+                      <th
+                        className="px-4 py-3 text-right font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600/50"
+                        onClick={() => handleSort("amount")}
+                      >
+                        Amount <SortIcon field="amount" />
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300">
+                        Payee <span className="text-xs font-normal text-slate-400">(click to edit)</span>
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-700 dark:text-slate-300">
+                        Memo <span className="text-xs font-normal text-slate-400">(click to edit)</span>
+                      </th>
+                      <th className="px-4 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">
+                        Confidence
+                      </th>
+                      <th className="px-4 py-3 text-center font-semibold text-slate-700 dark:text-slate-300">
+                        Image
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRecords.map((record, displayIdx) => {
+                      // Find the actual index in the full array for editing
+                      const actualIdx = checkRecords.findIndex(
+                        (r) => r.checkNumber === record.checkNumber
+                      );
+                      return (
+                        <tr
+                          key={record.checkNumber}
+                          className={`border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 ${
+                            record.needsReview ? "bg-amber-50/50 dark:bg-amber-900/10" : ""
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 font-mono text-slate-800 dark:text-slate-200">
+                            {record.checkNumber}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-600 dark:text-slate-400">
+                            {record.date}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono text-slate-800 dark:text-slate-200">
+                            ${record.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          </td>
+
+                          {/* Editable Payee Cell */}
+                          <td
+                            className="px-4 py-2.5 cursor-pointer"
+                            onClick={() => {
+                              if (editingCell?.row !== actualIdx || editingCell?.field !== "payee") {
+                                setEditingCell({ row: actualIdx, field: "payee" });
+                              }
+                            }}
+                          >
+                            {editingCell?.row === actualIdx && editingCell?.field === "payee" ? (
+                              <input
+                                autoFocus
+                                defaultValue={record.payee}
+                                onBlur={(e) => handleCellEdit(actualIdx, "payee", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                  if (e.key === "Escape") setEditingCell(null);
+                                }}
+                                className="w-full px-2 py-1 border border-blue-400 rounded text-sm bg-white dark:bg-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            ) : (
+                              <span className={record.payee ? "text-slate-800 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic"}>
+                                {record.payee || "Click to edit"}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Editable Memo Cell */}
+                          <td
+                            className="px-4 py-2.5 cursor-pointer"
+                            onClick={() => {
+                              if (editingCell?.row !== actualIdx || editingCell?.field !== "memo") {
+                                setEditingCell({ row: actualIdx, field: "memo" });
+                              }
+                            }}
+                          >
+                            {editingCell?.row === actualIdx && editingCell?.field === "memo" ? (
+                              <input
+                                autoFocus
+                                defaultValue={record.memo}
+                                onBlur={(e) => handleCellEdit(actualIdx, "memo", e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                  if (e.key === "Escape") setEditingCell(null);
+                                }}
+                                className="w-full px-2 py-1 border border-blue-400 rounded text-sm bg-white dark:bg-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            ) : (
+                              <span className={record.memo ? "text-slate-800 dark:text-slate-200" : "text-slate-400 dark:text-slate-500 italic"}>
+                                {record.memo || "Click to edit"}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Confidence Badge */}
+                          <td className="px-4 py-2.5 text-center">
+                            {record.hasOCR ? (
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  record.ocrConfidence >= 80
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                    : record.ocrConfidence >= 50
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                }`}
+                              >
+                                {Math.round(record.ocrConfidence)}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">No image</span>
+                            )}
+                          </td>
+
+                          {/* View Image Button */}
+                          <td className="px-4 py-2.5 text-center">
+                            {(record as CheckRecord & { imageDataUrl?: string }).imageDataUrl ? (
+                              <button
+                                onClick={() =>
+                                  setSelectedImage(
+                                    (record as CheckRecord & { imageDataUrl?: string }).imageDataUrl || null
+                                  )
+                                }
+                                className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {sortedRecords.length === 0 && filterNeedsReview && (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  All checks have been reviewed. Uncheck the filter to see all records.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Image Modal */}
+        {selectedImage && (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+            onClick={() => setSelectedImage(null)}
+          >
+            <div
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-4 max-w-2xl max-h-[90vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                  Check Image
+                </h3>
+                <button
+                  onClick={() => setSelectedImage(null)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl"
+                >
+                  &times;
+                </button>
+              </div>
+              <img
+                src={selectedImage}
+                alt="Check image"
+                className="w-full rounded border border-slate-200 dark:border-slate-600"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Status when done */}
+        {status.stage === "done" && (
+          <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
+            {status.message}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
