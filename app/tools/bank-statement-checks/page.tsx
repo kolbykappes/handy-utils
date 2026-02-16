@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import type { CheckRecord, ProcessingStatus } from "./types";
 import { extractCheckTransactions, extractCheckImages } from "./pdf-parser";
-import { initOCR, ocrCheckImage, terminateOCR } from "./ocr-engine";
+import { ocrCheckImage } from "./ocr-engine";
 import { downloadCheckExcel } from "./export";
 
 export default function BankStatementChecks() {
@@ -58,13 +58,7 @@ export default function BankStatementChecks() {
         });
       });
 
-      // Step 3: OCR each check image
-      setStatus({
-        stage: "ocr-processing",
-        message: "Initializing OCR engine...",
-      });
-      await initOCR();
-
+      // Step 3: Analyze each check image with Claude Vision API
       const ocrResults = new Map<string, { payee: string; memo: string; confidence: number; rawText: string; imageDataUrl?: string }>();
 
       for (let i = 0; i < checkImages.length; i++) {
@@ -74,7 +68,7 @@ export default function BankStatementChecks() {
           stage: "ocr-processing",
           currentCheck: i + 1,
           totalChecks: checkImages.length,
-          message: `OCR processing check ${i + 1} of ${checkImages.length} (Check #${checkImages[i].checkNumber})`,
+          message: `Analyzing check ${i + 1} of ${checkImages.length} (Check #${checkImages[i].checkNumber})`,
         });
 
         const result = await ocrCheckImage(
@@ -90,8 +84,6 @@ export default function BankStatementChecks() {
           imageDataUrl: result.imageDataUrl,
         });
       }
-
-      await terminateOCR();
 
       // Step 4: Correlate text transactions with OCR results
       setStatus({ stage: "correlating", message: "Matching OCR results..." });
@@ -121,7 +113,6 @@ export default function BankStatementChecks() {
       const msg = err instanceof Error ? err.message : "Processing failed";
       setError(msg);
       setStatus({ stage: "error", message: msg });
-      await terminateOCR().catch(() => {});
     }
   }, []);
 
