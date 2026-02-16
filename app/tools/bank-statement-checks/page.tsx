@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import type { CheckRecord, ProcessingStatus } from "./types";
 import { extractCheckTransactions, extractCheckImages } from "./pdf-parser";
 import { ocrCheckImage } from "./ocr-engine";
 import { downloadCheckExcel } from "./export";
+import { saveSession, loadSession, listSessions, deleteSession } from "./storage";
+import type { SavedSession } from "./storage";
 
 const BATCH_SIZE = 5;
 
@@ -33,6 +35,16 @@ export default function BankStatementChecks() {
   const [analyzedCount, setAnalyzedCount] = useState(0);
   const [totalImageCount, setTotalImageCount] = useState(0);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  // Session persistence
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionFileName, setSessionFileName] = useState<string>("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [savedSessions, setSavedSessions] = useState<any[]>([]);
+
+  // Load saved sessions list on mount
+  useEffect(() => {
+    listSessions().then(setSavedSessions).catch(() => {});
+  }, []);
 
   // Step 1+2: Extract text and images from PDF, build initial records (no AI calls yet)
   const processStatement = useCallback(async (file: File) => {
@@ -170,6 +182,104 @@ export default function BankStatementChecks() {
     }
   }, [pendingImages, isBatchProcessing, analyzedCount, totalImageCount]);
 
+  // Process ALL remaining check images
+  const processAllRemaining = useCallback(async () => {
+    if (pendingImages.length === 0 || isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    abortRef.current = false;
+
+    const allImages = [...pendingImages];
+
+    try {
+      for (let i = 0; i < allImages.length; i++) {
+        if (abortRef.current) break;
+
+        const batchIdx = analyzedCount + i + 1;
+        setStatus({
+          stage: "ocr-processing",
+          currentCheck: batchIdx,
+          totalChecks: totalImageCount,
+          message: `Analyzing check ${batchIdx} of ${totalImageCount} (Check #${allImages[i].checkNumber})`,
+        });
+
+        const result = await ocrCheckImage(allImages[i].imageDataUrl, allImages[i].checkNumber);
+
+        setCheckRecords((prev) =>
+          prev.map((r) => {
+            if (r.checkNumber !== result.checkNumber) return r;
+            return {
+              ...r,
+              payee: result.payee || r.payee,
+              memo: result.memo || r.memo,
+              ocrConfidence: result.confidence,
+              hasOCR: true,
+              needsReview: result.confidence < 70 || !result.payee,
+              rawOcrText: result.rawText,
+            } as CheckRecord & { imageDataUrl?: string; rawOcrText?: string };
+          })
+        );
+      }
+
+      const finalCount = analyzedCount + allImages.length;
+      setAnalyzedCount(finalCount);
+      setPendingImages([]);
+      setStatus({
+        stage: "done",
+        message: `All ${totalImageCount} check images analyzed.`,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Batch processing failed";
+      setError(msg);
+      setStatus({ stage: "error", message: msg });
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }, [pendingImages, isBatchProcessing, analyzedCount, totalImageCount]);
+
+  // Save current work to IndexedDB
+  const handleSave = useCallback(async () => {
+    const id = sessionId || crypto.randomUUID();
+    const session: SavedSession = {
+      id,
+      fileName: sessionFileName,
+      savedAt: new Date().toISOString(),
+      checkRecords: checkRecords as (CheckRecord & { imageDataUrl?: string; rawOcrText?: string })[],
+      pendingImages,
+      analyzedCount,
+      totalImageCount,
+    };
+    await saveSession(session);
+    setSessionId(id);
+    const updated = await listSessions();
+    setSavedSessions(updated);
+    setStatus({ stage: "done", message: `Saved! ${pendingImages.length > 0 ? `${pendingImages.length} images still pending analysis.` : "All images analyzed."}` });
+  }, [sessionId, sessionFileName, checkRecords, pendingImages, analyzedCount, totalImageCount]);
+
+  // Restore a saved session
+  const handleLoadSession = useCallback(async (id: string) => {
+    const session = await loadSession(id);
+    if (!session) return;
+    setCheckRecords(session.checkRecords);
+    setPendingImages(session.pendingImages);
+    setAnalyzedCount(session.analyzedCount);
+    setTotalImageCount(session.totalImageCount);
+    setSessionId(session.id);
+    setSessionFileName(session.fileName);
+    setError(null);
+    setStatus({
+      stage: "done",
+      message: `Loaded "${session.fileName}". ${session.pendingImages.length > 0 ? `${session.pendingImages.length} images still pending.` : "All images analyzed."}`,
+    });
+  }, []);
+
+  // Delete a saved session
+  const handleDeleteSession = useCallback(async (id: string) => {
+    await deleteSession(id);
+    const updated = await listSessions();
+    setSavedSessions(updated);
+    if (sessionId === id) setSessionId(null);
+  }, [sessionId]);
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -177,6 +287,8 @@ export default function BankStatementChecks() {
       setError("Please upload a PDF file.");
       return;
     }
+    setSessionId(crypto.randomUUID());
+    setSessionFileName(file.name);
     processStatement(file);
   };
 
@@ -314,6 +426,56 @@ export default function BankStatementChecks() {
           )}
         </div>
 
+        {/* Saved Sessions */}
+        {savedSessions.length > 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-4 border border-slate-200 dark:border-slate-700 mb-6">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
+              Saved Sessions
+            </h3>
+            <div className="space-y-2">
+              {savedSessions.map((s) => (
+                <div
+                  key={s.id}
+                  className={`flex items-center justify-between gap-4 p-3 rounded-lg border transition-colors ${
+                    sessionId === s.id
+                      ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600"
+                      : "border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                      {s.fileName}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {new Date(s.savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
+                      at {new Date(s.savedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      {" · "}
+                      {s.analyzedCount}/{s.totalImageCount} analyzed
+                      {s.totalChecks ? ` · ${s.totalChecks} checks` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleLoadSession(s.id)}
+                      disabled={isProcessing || isBatchProcessing}
+                      className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSession(s.id)}
+                      disabled={isProcessing || isBatchProcessing}
+                      className="px-3 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Results */}
         {checkRecords.length > 0 && (
           <>
@@ -350,7 +512,14 @@ export default function BankStatementChecks() {
                       >
                         {isBatchProcessing
                           ? "Analyzing..."
-                          : `Analyze Next ${Math.min(BATCH_SIZE, pendingImages.length)} Checks`}
+                          : `Analyze Next ${Math.min(BATCH_SIZE, pendingImages.length)}`}
+                      </button>
+                      <button
+                        onClick={processAllRemaining}
+                        disabled={isBatchProcessing}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        {isBatchProcessing ? "..." : `Analyze All ${pendingImages.length}`}
                       </button>
                       <span className="text-xs text-slate-500 dark:text-slate-400">
                         {analyzedCount}/{totalImageCount} done
@@ -362,6 +531,12 @@ export default function BankStatementChecks() {
                       All images analyzed
                     </span>
                   )}
+                  <button
+                    onClick={handleSave}
+                    className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Save Progress
+                  </button>
                   <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
                     <input
                       type="checkbox"
