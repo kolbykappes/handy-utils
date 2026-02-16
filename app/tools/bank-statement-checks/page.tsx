@@ -7,6 +7,10 @@ import { extractCheckTransactions, extractCheckImages } from "./pdf-parser";
 import { ocrCheckImage } from "./ocr-engine";
 import { downloadCheckExcel } from "./export";
 
+const BATCH_SIZE = 5;
+
+type PendingImage = { checkNumber: string; imageDataUrl: string };
+
 export default function BankStatementChecks() {
   const [status, setStatus] = useState<ProcessingStatus>({
     stage: "idle",
@@ -24,14 +28,22 @@ export default function BankStatementChecks() {
   const [selectedCheck, setSelectedCheck] = useState<{ image: string; rawText: string; checkNumber: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
+  // Batch processing state
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [analyzedCount, setAnalyzedCount] = useState(0);
+  const [totalImageCount, setTotalImageCount] = useState(0);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
+  // Step 1+2: Extract text and images from PDF, build initial records (no AI calls yet)
   const processStatement = useCallback(async (file: File) => {
     setError(null);
     setCheckRecords([]);
+    setPendingImages([]);
+    setAnalyzedCount(0);
+    setTotalImageCount(0);
     abortRef.current = false;
 
     try {
-      // Step 1: Extract text-based check transactions
       setStatus({
         stage: "extracting-text",
         message: "Loading PDF and extracting check data...",
@@ -44,7 +56,6 @@ export default function BankStatementChecks() {
         return;
       }
 
-      // Step 2: Extract check images
       setStatus({
         stage: "rendering-pages",
         message: "Rendering check image pages...",
@@ -58,56 +69,35 @@ export default function BankStatementChecks() {
         });
       });
 
-      // Step 3: Analyze each check image with Claude Vision API
-      const ocrResults = new Map<string, { payee: string; memo: string; confidence: number; rawText: string; imageDataUrl?: string }>();
-
-      for (let i = 0; i < checkImages.length; i++) {
-        if (abortRef.current) break;
-
-        setStatus({
-          stage: "ocr-processing",
-          currentCheck: i + 1,
-          totalChecks: checkImages.length,
-          message: `Analyzing check ${i + 1} of ${checkImages.length} (Check #${checkImages[i].checkNumber})`,
-        });
-
-        const result = await ocrCheckImage(
-          checkImages[i].imageDataUrl,
-          checkImages[i].checkNumber
-        );
-
-        ocrResults.set(result.checkNumber, {
-          payee: result.payee,
-          memo: result.memo,
-          confidence: result.confidence,
-          rawText: result.rawText,
-          imageDataUrl: result.imageDataUrl,
-        });
+      // Build initial records with no OCR data yet
+      const imageMap = new Map<string, string>();
+      for (const img of checkImages) {
+        imageMap.set(img.checkNumber, img.imageDataUrl);
       }
 
-      // Step 4: Correlate text transactions with OCR results
-      setStatus({ stage: "correlating", message: "Matching OCR results..." });
-
-      const records: CheckRecord[] = transactions.map((t) => {
-        const ocr = ocrResults.get(t.checkNumber);
+      const records = transactions.map((t) => {
+        const imgUrl = imageMap.get(t.checkNumber);
         return {
           checkNumber: t.checkNumber,
           date: t.date,
           amount: t.amount,
-          payee: ocr?.payee || "",
-          memo: ocr?.memo || "",
-          ocrConfidence: ocr?.confidence || 0,
-          hasOCR: !!ocr,
-          needsReview: !ocr || (ocr.confidence < 70) || !ocr.payee,
-          imageDataUrl: ocr?.imageDataUrl,
-          rawOcrText: ocr?.rawText || "",
+          payee: "",
+          memo: "",
+          ocrConfidence: 0,
+          hasOCR: false,
+          needsReview: true,
+          imageDataUrl: imgUrl || "",
+          rawOcrText: "",
         } as CheckRecord & { imageDataUrl?: string; rawOcrText?: string };
       });
 
       setCheckRecords(records);
+      setPendingImages(checkImages.map((img) => ({ checkNumber: img.checkNumber, imageDataUrl: img.imageDataUrl })));
+      setTotalImageCount(checkImages.length);
+      setAnalyzedCount(0);
       setStatus({
         stage: "done",
-        message: `Processed ${records.length} checks. ${records.filter((r) => r.needsReview).length} need review.`,
+        message: `Found ${records.length} checks with ${checkImages.length} images. Click "Analyze Next Batch" to start AI analysis (${BATCH_SIZE} at a time).`,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Processing failed";
@@ -115,6 +105,70 @@ export default function BankStatementChecks() {
       setStatus({ stage: "error", message: msg });
     }
   }, []);
+
+  // Process the next batch of check images through Claude Vision
+  const processNextBatch = useCallback(async () => {
+    if (pendingImages.length === 0 || isBatchProcessing) return;
+    setIsBatchProcessing(true);
+    abortRef.current = false;
+
+    const batch = pendingImages.slice(0, BATCH_SIZE);
+    const remaining = pendingImages.slice(BATCH_SIZE);
+
+    try {
+      for (let i = 0; i < batch.length; i++) {
+        if (abortRef.current) break;
+
+        const batchIdx = analyzedCount + i + 1;
+        setStatus({
+          stage: "ocr-processing",
+          currentCheck: batchIdx,
+          totalChecks: totalImageCount,
+          message: `Analyzing check ${batchIdx} of ${totalImageCount} (Check #${batch[i].checkNumber})`,
+        });
+
+        const result = await ocrCheckImage(batch[i].imageDataUrl, batch[i].checkNumber);
+
+        // Update the matching record in place
+        setCheckRecords((prev) =>
+          prev.map((r) => {
+            if (r.checkNumber !== result.checkNumber) return r;
+            return {
+              ...r,
+              payee: result.payee || r.payee,
+              memo: result.memo || r.memo,
+              ocrConfidence: result.confidence,
+              hasOCR: true,
+              needsReview: result.confidence < 70 || !result.payee,
+              rawOcrText: result.rawText,
+            } as CheckRecord & { imageDataUrl?: string; rawOcrText?: string };
+          })
+        );
+      }
+
+      const newAnalyzed = analyzedCount + batch.length;
+      setAnalyzedCount(newAnalyzed);
+      setPendingImages(remaining);
+
+      if (remaining.length === 0) {
+        setStatus({
+          stage: "done",
+          message: `All ${totalImageCount} check images analyzed.`,
+        });
+      } else {
+        setStatus({
+          stage: "done",
+          message: `Analyzed ${newAnalyzed} of ${totalImageCount} images. ${remaining.length} remaining — review results then click "Analyze Next Batch".`,
+        });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Batch processing failed";
+      setError(msg);
+      setStatus({ stage: "error", message: msg });
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  }, [pendingImages, isBatchProcessing, analyzedCount, totalImageCount]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -287,6 +341,27 @@ export default function BankStatementChecks() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                  {pendingImages.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={processNextBatch}
+                        disabled={isBatchProcessing}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        {isBatchProcessing
+                          ? "Analyzing..."
+                          : `Analyze Next ${Math.min(BATCH_SIZE, pendingImages.length)} Checks`}
+                      </button>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {analyzedCount}/{totalImageCount} done
+                      </span>
+                    </div>
+                  )}
+                  {pendingImages.length === 0 && totalImageCount > 0 && (
+                    <span className="text-xs text-green-600 dark:text-green-400 font-semibold">
+                      All images analyzed
+                    </span>
+                  )}
                   <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 cursor-pointer">
                     <input
                       type="checkbox"
@@ -505,7 +580,7 @@ export default function BankStatementChecks() {
               {selectedCheck.rawText && (
                 <div>
                   <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Raw OCR Text
+                    AI Response
                   </h4>
                   <pre className="text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded p-3 whitespace-pre-wrap font-mono text-slate-700 dark:text-slate-300 max-h-48 overflow-auto">
                     {selectedCheck.rawText}
