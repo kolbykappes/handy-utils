@@ -230,7 +230,8 @@ export async function extractCheckImages(
     if (checks.length === 0) continue;
 
     const page = await pdfDoc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+    const renderScale = 4.0;
+    const viewport = page.getViewport({ scale: renderScale });
 
     const canvas = document.createElement("canvas");
     canvas.width = viewport.width;
@@ -239,19 +240,17 @@ export async function extractCheckImages(
 
     await page.render({ canvasContext: ctx, canvas, viewport }).promise;
 
-    // Grid cell dimensions in canvas coords (at scale 2.0)
     const pageHeight = viewport.height;
     const colWidth = viewport.width / 3;
-    const scale = 2.0;
 
     for (const check of checks) {
       const labelPdfY = rowYPositions[check.row];
       // Convert PDF y to canvas y (flip vertical)
       // The label is at the bottom of the check image
       // Each cell is about 102 PDF units tall
-      const cellHeight = 102 * scale;
-      const labelCanvasY = pageHeight - labelPdfY * scale;
-      const cropY = Math.max(0, labelCanvasY - cellHeight + 10 * scale);
+      const cellHeight = 102 * renderScale;
+      const labelCanvasY = pageHeight - labelPdfY * renderScale;
+      const cropY = Math.max(0, labelCanvasY - cellHeight + 10 * renderScale);
       const cropX = check.col * colWidth;
       const cropW = colWidth;
       const cropH = cellHeight;
