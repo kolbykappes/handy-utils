@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 export default function Home() {
@@ -9,6 +11,7 @@ export default function Home() {
       icon: "💰",
       version: "1.2",
       updatedAt: "2026-01-17T21:06:00Z",
+      changelogId: "interest-rate",
     },
     {
       name: "Time Report Generator",
@@ -17,6 +20,7 @@ export default function Home() {
       icon: "📊",
       version: "1.3",
       updatedAt: "2026-02-12T19:36:00Z",
+      changelogId: "time-report",
     },
     {
       name: "Markdown ↔ HTML Converter",
@@ -25,6 +29,7 @@ export default function Home() {
       icon: "🔄",
       version: "1.6",
       updatedAt: "2026-01-19T21:53:00Z",
+      changelogId: "markdown-html",
     },
     {
       name: "Expense Reconciliation",
@@ -33,6 +38,7 @@ export default function Home() {
       icon: "💳",
       version: "1.3",
       updatedAt: "2026-01-30T18:38:00Z",
+      changelogId: "expense-reconciliation",
     },
     {
       name: "Weather Days for Job Sites",
@@ -41,14 +47,16 @@ export default function Home() {
       icon: "🌤️",
       version: "1.2",
       updatedAt: "2026-02-08T19:58:00Z",
+      changelogId: "weather-days",
     },
     {
       name: "Bank Statement Check Parser",
-      description: "Parse check data from bank statement PDFs with OCR for payee and memo",
+      description: "Parse check data from bank statement PDFs with AI-powered payee recognition",
       href: "/tools/bank-statement-checks",
       icon: "🏦",
-      version: "1.0",
-      updatedAt: "2026-02-16T19:43:00Z",
+      version: "1.3",
+      updatedAt: "2026-02-16T20:22:00Z",
+      changelogId: "bank-statement-checks",
     },
   ];
 
@@ -62,6 +70,12 @@ export default function Home() {
           <p className="text-lg text-slate-600 dark:text-slate-400">
             A collection of useful calculators and utilities
           </p>
+          <Link
+            href="/changelog"
+            className="inline-block mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            View full changelog →
+          </Link>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -78,7 +92,14 @@ export default function Home() {
                     <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                       {calculator.name}
                     </h2>
-                    <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                    <span
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.location.href = `/changelog#${calculator.changelogId}`;
+                      }}
+                      className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                      title="View changelog"
+                    >
                       v{calculator.version}
                     </span>
                   </div>
