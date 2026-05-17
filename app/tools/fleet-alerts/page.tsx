@@ -3,24 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { parseAlertsFile, VehicleAlertSummary, AlertCategory, AlertDetail } from "./parser";
+import { formatEmailText } from "./formatters";
 
 interface DrillDown {
   vehicle: string;
   category: AlertCategory;
   details: AlertDetail[];
-}
-
-function formatEmailText(vehicle: string, category: AlertCategory, details: AlertDetail[]): string {
-  const label = category === "speeding" ? "Speeding" : "Harsh Braking";
-  const lines = [
-    `${label} alerts — ${vehicle}`,
-    `Period: ${details[0]?.date.split(" ")[0] ?? ""} through ${details[details.length - 1]?.date.split(" ")[0] ?? ""}`,
-    "",
-    ...details.map((d) => `• ${d.date}${d.description ? ` — ${d.description}` : ""}`),
-    "",
-    `Total: ${details.length} alert${details.length !== 1 ? "s" : ""}`,
-  ];
-  return lines.join("\n");
 }
 
 export default function FleetAlerts() {
