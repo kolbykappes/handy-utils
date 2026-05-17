@@ -2,25 +2,34 @@ import * as XLSX from "xlsx";
 
 export const ALERT_TYPES = {
   speeding: "Speeding Alert",
-  highSpeed: "High Speed Alert",
   harshBraking: "Harsh Braking",
-  rapidAccel: "Rapid Acceleration",
 } as const;
 
 export type AlertCategory = keyof typeof ALERT_TYPES;
 
+export interface AlertDetail {
+  date: string;
+  location: string;
+  description: string;
+}
+
 export interface VehicleAlertSummary {
   vehicle: string;
   speeding: number;
-  highSpeed: number;
   harshBraking: number;
-  rapidAccel: number;
   total: number;
+  details: {
+    speeding: AlertDetail[];
+    harshBraking: AlertDetail[];
+  };
 }
 
 interface AlertRow {
   "Tracker Name": string;
   Type: string;
+  Date: string;
+  Location: string;
+  Description: string;
 }
 
 const TRACKED_TYPES = new Set<string>(Object.values(ALERT_TYPES));
@@ -36,28 +45,34 @@ export function parseAlertsFile(file: File): Promise<VehicleAlertSummary[]> {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows: AlertRow[] = XLSX.utils.sheet_to_json(sheet);
 
-        const counts: Record<string, Record<AlertCategory, number>> = {};
+        const buckets: Record<string, { speeding: AlertDetail[]; harshBraking: AlertDetail[] }> = {};
 
         for (const row of rows) {
           const vehicle = row["Tracker Name"]?.trim();
           const type = row["Type"]?.trim();
           if (!vehicle || !TRACKED_TYPES.has(type)) continue;
 
-          if (!counts[vehicle]) {
-            counts[vehicle] = { speeding: 0, highSpeed: 0, harshBraking: 0, rapidAccel: 0 };
+          if (!buckets[vehicle]) {
+            buckets[vehicle] = { speeding: [], harshBraking: [] };
           }
 
-          if (type === ALERT_TYPES.speeding) counts[vehicle].speeding++;
-          else if (type === ALERT_TYPES.highSpeed) counts[vehicle].highSpeed++;
-          else if (type === ALERT_TYPES.harshBraking) counts[vehicle].harshBraking++;
-          else if (type === ALERT_TYPES.rapidAccel) counts[vehicle].rapidAccel++;
+          const detail: AlertDetail = {
+            date: String(row["Date"] ?? "").trim(),
+            location: String(row["Location"] ?? "").trim(),
+            description: String(row["Description"] ?? "").trim(),
+          };
+
+          if (type === ALERT_TYPES.speeding) buckets[vehicle].speeding.push(detail);
+          else if (type === ALERT_TYPES.harshBraking) buckets[vehicle].harshBraking.push(detail);
         }
 
-        const summaries: VehicleAlertSummary[] = Object.entries(counts).map(
-          ([vehicle, c]) => ({
+        const summaries: VehicleAlertSummary[] = Object.entries(buckets).map(
+          ([vehicle, d]) => ({
             vehicle,
-            ...c,
-            total: c.speeding + c.highSpeed + c.harshBraking + c.rapidAccel,
+            speeding: d.speeding.length,
+            harshBraking: d.harshBraking.length,
+            total: d.speeding.length + d.harshBraking.length,
+            details: d,
           })
         );
 

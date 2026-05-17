@@ -2,13 +2,34 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { parseAlertsFile, VehicleAlertSummary } from "./parser";
+import { parseAlertsFile, VehicleAlertSummary, AlertCategory, AlertDetail } from "./parser";
+
+interface DrillDown {
+  vehicle: string;
+  category: AlertCategory;
+  details: AlertDetail[];
+}
+
+function formatEmailText(vehicle: string, category: AlertCategory, details: AlertDetail[]): string {
+  const label = category === "speeding" ? "Speeding" : "Harsh Braking";
+  const lines = [
+    `${label} alerts — ${vehicle}`,
+    `Period: ${details[0]?.date.split(" ")[0] ?? ""} through ${details[details.length - 1]?.date.split(" ")[0] ?? ""}`,
+    "",
+    ...details.map((d) => `• ${d.date}${d.description ? ` — ${d.description}` : ""}`),
+    "",
+    `Total: ${details.length} alert${details.length !== 1 ? "s" : ""}`,
+  ];
+  return lines.join("\n");
+}
 
 export default function FleetAlerts() {
   const [summaries, setSummaries] = useState<VehicleAlertSummary[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -18,12 +39,13 @@ export default function FleetAlerts() {
     setError(null);
     setSummaries([]);
     setFileName(file.name);
+    setDrillDown(null);
 
     try {
       const data = await parseAlertsFile(file);
       setSummaries(data);
       if (data.length === 0) {
-        setError("No speeding, high speed, harsh braking, or rapid acceleration alerts found.");
+        setError("No speeding or harsh braking alerts found.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse file");
@@ -32,16 +54,29 @@ export default function FleetAlerts() {
     }
   };
 
+  const handleCellClick = (row: VehicleAlertSummary, category: AlertCategory) => {
+    const details = row.details[category];
+    if (details.length === 0) return;
+    setDrillDown({ vehicle: row.vehicle, category, details });
+    setCopied(false);
+  };
+
+  const handleCopy = () => {
+    if (!drillDown) return;
+    navigator.clipboard.writeText(
+      formatEmailText(drillDown.vehicle, drillDown.category, drillDown.details)
+    );
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const totalRow = summaries.reduce(
     (acc, v) => ({
-      vehicle: "TOTAL",
       speeding: acc.speeding + v.speeding,
-      highSpeed: acc.highSpeed + v.highSpeed,
       harshBraking: acc.harshBraking + v.harshBraking,
-      rapidAccel: acc.rapidAccel + v.rapidAccel,
       total: acc.total + v.total,
     }),
-    { vehicle: "TOTAL", speeding: 0, highSpeed: 0, harshBraking: 0, rapidAccel: 0, total: 0 }
+    { speeding: 0, harshBraking: 0, total: 0 }
   );
 
   return (
@@ -90,80 +125,119 @@ export default function FleetAlerts() {
           )}
         </div>
 
-        {/* Results Table */}
         {summaries.length > 0 && (
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-              <h2 className="text-lg font-bold">
-                Driver Behavior Alerts — {summaries.length} vehicle{summaries.length !== 1 ? "s" : ""}
-              </h2>
-            </div>
+          <div className={`grid gap-6 ${drillDown ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}>
+            {/* Summary Table */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="p-5 border-b border-slate-200 dark:border-slate-700">
+                <h2 className="text-lg font-bold">
+                  Driver Behavior Alerts — {summaries.length} vehicle{summaries.length !== 1 ? "s" : ""}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">Click a count to see details</p>
+              </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900 text-left">
-                    <th className="px-6 py-3 font-semibold text-slate-700 dark:text-slate-300">Vehicle</th>
-                    <th className="px-4 py-3 font-semibold text-amber-600 dark:text-amber-400 text-center">Speeding</th>
-                    <th className="px-4 py-3 font-semibold text-orange-600 dark:text-orange-400 text-center">High Speed</th>
-                    <th className="px-4 py-3 font-semibold text-red-600 dark:text-red-400 text-center">Harsh Braking</th>
-                    <th className="px-4 py-3 font-semibold text-purple-600 dark:text-purple-400 text-center">Rapid Accel</th>
-                    <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 text-center">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {summaries.map((row) => (
-                    <tr
-                      key={row.vehicle}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                        {row.vehicle}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <AlertBadge count={row.speeding} color="amber" />
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <AlertBadge count={row.highSpeed} color="orange" />
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <AlertBadge count={row.harshBraking} color="red" />
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <AlertBadge count={row.rapidAccel} color="purple" />
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                          row.total === 0
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200"
-                        }`}>
-                          {row.total === 0 ? "✓ Clean" : row.total}
-                        </span>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-900 text-left">
+                      <th className="px-6 py-3 font-semibold text-slate-700 dark:text-slate-300">Vehicle</th>
+                      <th className="px-4 py-3 font-semibold text-amber-600 dark:text-amber-400 text-center">Speeding</th>
+                      <th className="px-4 py-3 font-semibold text-red-600 dark:text-red-400 text-center">Harsh Braking</th>
+                      <th className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 text-center">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-50 dark:bg-slate-900 border-t-2 border-slate-200 dark:border-slate-600 font-semibold">
-                    <td className="px-6 py-3 text-slate-700 dark:text-slate-300">Total</td>
-                    <td className="px-4 py-3 text-center text-amber-600 dark:text-amber-400">{totalRow.speeding || "—"}</td>
-                    <td className="px-4 py-3 text-center text-orange-600 dark:text-orange-400">{totalRow.highSpeed || "—"}</td>
-                    <td className="px-4 py-3 text-center text-red-600 dark:text-red-400">{totalRow.harshBraking || "—"}</td>
-                    <td className="px-4 py-3 text-center text-purple-600 dark:text-purple-400">{totalRow.rapidAccel || "—"}</td>
-                    <td className="px-4 py-3 text-center text-slate-800 dark:text-slate-200">{totalRow.total}</td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                    {summaries.map((row) => (
+                      <tr
+                        key={row.vehicle}
+                        className={`transition-colors ${
+                          drillDown?.vehicle === row.vehicle
+                            ? "bg-orange-50 dark:bg-orange-900/10"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                        }`}
+                      >
+                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                          {row.vehicle}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <ClickableBadge
+                            count={row.speeding}
+                            color="amber"
+                            active={drillDown?.vehicle === row.vehicle && drillDown?.category === "speeding"}
+                            onClick={() => handleCellClick(row, "speeding")}
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <ClickableBadge
+                            count={row.harshBraking}
+                            color="red"
+                            active={drillDown?.vehicle === row.vehicle && drillDown?.category === "harshBraking"}
+                            onClick={() => handleCellClick(row, "harshBraking")}
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
+                            row.total === 0
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200"
+                          }`}>
+                            {row.total === 0 ? "✓ Clean" : row.total}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 dark:bg-slate-900 border-t-2 border-slate-200 dark:border-slate-600 font-semibold">
+                      <td className="px-6 py-3 text-slate-700 dark:text-slate-300">Total</td>
+                      <td className="px-4 py-3 text-center text-amber-600 dark:text-amber-400">{totalRow.speeding || "—"}</td>
+                      <td className="px-4 py-3 text-center text-red-600 dark:text-red-400">{totalRow.harshBraking || "—"}</td>
+                      <td className="px-4 py-3 text-center text-slate-800 dark:text-slate-200">{totalRow.total}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
 
-            {/* Legend */}
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-              <span><span className="text-amber-600 font-semibold">Speeding</span> — over posted limit</span>
-              <span><span className="text-orange-600 font-semibold">High Speed</span> — threshold speed exceeded</span>
-              <span><span className="text-red-600 font-semibold">Harsh Braking</span> — hard stop detected</span>
-              <span><span className="text-purple-600 font-semibold">Rapid Accel</span> — hard acceleration detected</span>
-            </div>
+            {/* Drill-down panel */}
+            {drillDown && (
+              <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col">
+                <div className="flex items-start justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                  <div>
+                    <h2 className="text-lg font-bold">
+                      {drillDown.category === "speeding" ? "🟡 Speeding" : "🔴 Harsh Braking"}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">{drillDown.vehicle}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopy}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        copied
+                          ? "bg-green-600 text-white"
+                          : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300"
+                      }`}
+                    >
+                      {copied ? "✓ Copied" : "📋 Copy for email"}
+                    </button>
+                    <button
+                      onClick={() => setDrillDown(null)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl leading-none px-1"
+                      aria-label="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+
+                {/* Email-ready preview */}
+                <div className="flex-1 p-5 overflow-y-auto">
+                  <pre className="whitespace-pre-wrap font-mono text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                    {formatEmailText(drillDown.vehicle, drillDown.category, drillDown.details)}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -180,19 +254,32 @@ export default function FleetAlerts() {
   );
 }
 
-function AlertBadge({ count, color }: { count: number; color: "amber" | "orange" | "red" | "purple" }) {
+function ClickableBadge({
+  count,
+  color,
+  active,
+  onClick,
+}: {
+  count: number;
+  color: "amber" | "red";
+  active: boolean;
+  onClick: () => void;
+}) {
   if (count === 0) return <span className="text-slate-300 dark:text-slate-600">—</span>;
 
-  const styles: Record<string, string> = {
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-    orange: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-    red: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-    purple: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  };
+  const base =
+    color === "amber"
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60";
+
+  const ring = active ? "ring-2 ring-offset-1 ring-current" : "";
 
   return (
-    <span className={`inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold ${styles[color]}`}>
+    <button
+      onClick={onClick}
+      className={`inline-block px-2.5 py-0.5 rounded-full text-sm font-semibold transition-colors cursor-pointer ${base} ${ring}`}
+    >
       {count}
-    </span>
+    </button>
   );
 }
