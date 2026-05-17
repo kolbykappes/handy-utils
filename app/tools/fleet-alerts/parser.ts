@@ -23,7 +23,7 @@ interface AlertRow {
   Type: string;
 }
 
-const TRACKED_TYPES = new Set(Object.values(ALERT_TYPES));
+const TRACKED_TYPES = new Set<string>(Object.values(ALERT_TYPES));
 
 export function parseAlertsFile(file: File): Promise<VehicleAlertSummary[]> {
   return new Promise((resolve, reject) => {
