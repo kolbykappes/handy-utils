@@ -58,6 +58,15 @@ export default function Home() {
       updatedAt: "2026-02-16T20:22:00Z",
       changelogId: "bank-statement-checks",
     },
+    {
+      name: "Fleet Alert Summary",
+      description: "Upload a Linxup alert export to see speeding and braking events by vehicle",
+      href: "/tools/fleet-alerts",
+      icon: "🚛",
+      version: "1.0",
+      updatedAt: "2026-05-17T00:00:00Z",
+      changelogId: "fleet-alerts",
+    },
   ];
 
   return (
