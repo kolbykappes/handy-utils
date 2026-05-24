@@ -1,8 +1,16 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 export default function Home() {
+  const [isLocal, setIsLocal] = useState(false);
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    setIsLocal(host === "localhost" || host === "127.0.0.1");
+  }, []);
+
   const calculators = [
     {
       name: "Interest Rate Calculator",
@@ -67,6 +75,16 @@ export default function Home() {
       updatedAt: "2026-05-17T00:00:00Z",
       changelogId: "fleet-alerts",
     },
+    {
+      name: "Credit Card Tracker",
+      description: "Categorize 5179 card charges by entity (MTM, EG, Kory, Me) and track expense/payment dates",
+      href: "/tools/credit-card-tracker",
+      icon: "💳",
+      version: "1.0",
+      updatedAt: "2026-05-23T00:00:00Z",
+      changelogId: "credit-card-tracker",
+      localOnly: true,
+    },
   ];
 
   return (
@@ -88,40 +106,73 @@ export default function Home() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {calculators.map((calculator) => (
-            <Link
-              key={calculator.href}
-              href={calculator.href}
-              className="group block p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-slate-200 dark:border-slate-700"
-            >
-              <div className="flex items-start gap-4">
-                <div className="text-4xl">{calculator.icon}</div>
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {calculator.name}
-                    </h2>
-                    <span
-                      onClick={(e) => {
-                        e.preventDefault();
-                        window.location.href = `/changelog#${calculator.changelogId}`;
-                      }}
-                      className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                      title="View changelog"
-                    >
-                      v{calculator.version}
-                    </span>
+          {calculators.map((calculator) => {
+            const disabled = calculator.localOnly && !isLocal;
+
+            if (disabled) {
+              return (
+                <div
+                  key={calculator.href}
+                  className="block p-6 bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed select-none"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl grayscale">{calculator.icon}</div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+                          {calculator.name}
+                        </h2>
+                        <span className="shrink-0 text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded">
+                          Local only
+                        </span>
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
+                        {calculator.description}
+                      </p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">
+                        Run locally at localhost:3000 to use this tool
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
-                    {calculator.description}
-                  </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    Updated {new Date(calculator.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })} at {new Date(calculator.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                  </p>
                 </div>
-              </div>
-            </Link>
-          ))}
+              );
+            }
+
+            return (
+              <Link
+                key={calculator.href}
+                href={calculator.href}
+                className="group block p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-slate-200 dark:border-slate-700"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">{calculator.icon}</div>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {calculator.name}
+                      </h2>
+                      <span
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.location.href = `/changelog#${calculator.changelogId}`;
+                        }}
+                        className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                        title="View changelog"
+                      >
+                        v{calculator.version}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
+                      {calculator.description}
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      Updated {new Date(calculator.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })} at {new Date(calculator.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </main>
