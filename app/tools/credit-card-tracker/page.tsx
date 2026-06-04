@@ -114,11 +114,15 @@ export default function CreditCardTracker() {
       .finally(() => setLoading(false));
   }, [isLocal]);
 
+  useEffect(() => {
+    document.title = "Handy Utils - 5179";
+  }, []);
+
   // Auto-save with 1.5s debounce
   useEffect(() => {
     if (pending.size === 0) return;
-    setSaveStatus("saving");
     const timer = setTimeout(async () => {
+      setSaveStatus("saving");
       try {
         const updates: SavePayload[] = [];
         for (const [rowIndex, changes] of pending.entries()) {
@@ -551,7 +555,7 @@ export default function CreditCardTracker() {
               <col style={{ width: 90 }} />
               <col />
               <col style={{ width: 90 }} />
-              <col style={{ width: 220 }} />
+              <col style={{ width: 260 }} />
               <col style={{ width: 240 }} />
               <col style={{ width: 130 }} />
               <col style={{ width: 130 }} />

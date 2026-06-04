@@ -11,6 +11,37 @@ const FILE_PATH = path.join(
   "Expenses 5179 Card - Year to date - 2026.xlsx"
 );
 
+const ARCHIVES_DIR = path.join(process.cwd(), "app", "source-docs", "archives");
+
+/**
+ * Copy the current file into archives/ if the newest archive is >= 1 hour old
+ * (or no archive exists yet). Called once before each save so data is never lost.
+ */
+function maybeArchive(): void {
+  if (!fs.existsSync(ARCHIVES_DIR)) {
+    fs.mkdirSync(ARCHIVES_DIR, { recursive: true });
+  }
+
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const existing = fs.readdirSync(ARCHIVES_DIR).filter((f) => f.endsWith(".xlsx"));
+
+  if (existing.length > 0) {
+    const newestMs = existing
+      .map((f) => fs.statSync(path.join(ARCHIVES_DIR, f)).mtimeMs)
+      .reduce((a, b) => Math.max(a, b), 0);
+    if (Date.now() - newestMs < ONE_HOUR_MS) return; // recent archive — nothing to do
+  }
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  const stamp =
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` +
+    `_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+
+  const base = path.basename(FILE_PATH, ".xlsx");
+  fs.copyFileSync(FILE_PATH, path.join(ARCHIVES_DIR, `${base}_${stamp}.xlsx`));
+}
+
 const COL = {
   DATE: 0,
   DESCRIPTION: 1,
@@ -178,6 +209,9 @@ export async function POST(request: NextRequest) {
       range.e.c = COL.SUB_ENTITY;
       ws["!ref"] = XLSX.utils.encode_range(range);
     }
+
+    // Archive the current file (at most once per hour) before overwriting
+    maybeArchive();
 
     try {
       const outBuf: Buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });

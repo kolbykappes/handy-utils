@@ -85,6 +85,16 @@ export default function Home() {
       changelogId: "credit-card-tracker",
       localOnly: true,
     },
+    {
+      name: "AmEx Tracker",
+      description: "Categorize AmEx business card charges as MTM or Personal and track expense filing status",
+      href: "/tools/amex-tracker",
+      icon: "💳",
+      version: "1.0",
+      updatedAt: "2026-05-24T00:00:00Z",
+      changelogId: "amex-tracker",
+      localOnly: true,
+    },
   ];
 
   return (
