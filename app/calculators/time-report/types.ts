@@ -21,6 +21,12 @@ export interface TimeEntry {
   netPay: number;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  employees: Employee[];
+}
+
 export interface GenerationOptions {
   startDate: Date;
   endDate: Date;
