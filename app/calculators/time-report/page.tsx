@@ -2,9 +2,10 @@
 
 import { useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
-import { EMPLOYEES, DEFAULT_WITHHOLDING_RATE } from "./employees";
+import { DEFAULT_WITHHOLDING_RATE } from "./employees";
 import { generateTimeReport, generateCSV, downloadCSV, downloadExcel } from "./generator";
-import { TimeEntry, Employee } from "./types";
+import { TimeEntry, Team } from "./types";
+import { loadTeams, saveTeams } from "./teams";
 
 function formatNumber(num: number, decimals: number = 2): string {
   return num.toLocaleString("en-US", {
@@ -30,29 +31,26 @@ export default function TimeReportGenerator() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [error, setError] = useState<string>("");
   const [generating, setGenerating] = useState<boolean>(false);
-  const [employees, setEmployees] = useState<Employee[]>(EMPLOYEES);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [customHolidays, setCustomHolidays] = useState<string[]>([]);
   const [newHoliday, setNewHoliday] = useState<string>("");
 
-  // Load custom employees from localStorage on mount
+  const employees = teams.find((t) => t.id === selectedTeamId)?.employees ?? [];
+
   useEffect(() => {
-    const savedEmployees = localStorage.getItem("customEmployees");
-    if (savedEmployees) {
-      try {
-        setEmployees(JSON.parse(savedEmployees));
-      } catch (e) {
-        console.error("Failed to load custom employees:", e);
-        setEmployees(EMPLOYEES);
-      }
-    }
+    const load = () => {
+      const loaded = loadTeams();
+      setTeams(loaded);
+      setSelectedTeamId((prev) => loaded.find((t) => t.id === prev) ? prev : (loaded[0]?.id ?? ""));
+    };
+    load();
     const savedHolidays = localStorage.getItem("customHolidays");
     if (savedHolidays) {
-      try {
-        setCustomHolidays(JSON.parse(savedHolidays));
-      } catch (e) {
-        // ignore
-      }
+      try { setCustomHolidays(JSON.parse(savedHolidays)); } catch { /* ignore */ }
     }
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
   }, []);
 
   const handleAddHoliday = () => {
@@ -190,6 +188,22 @@ export default function TimeReportGenerator() {
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 border border-slate-200 dark:border-slate-700">
             <form onSubmit={handleGenerate} className="space-y-4">
               <div>
+                <label htmlFor="teamSelect" className="block text-sm font-medium mb-2">
+                  Team
+                </label>
+                <select
+                  id="teamSelect"
+                  value={selectedTeamId}
+                  onChange={(e) => { setSelectedTeamId(e.target.value); setEntries([]); }}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700"
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label htmlFor="startDate" className="block text-sm font-medium mb-2">
                   Start Date
                 </label>
@@ -310,10 +324,10 @@ export default function TimeReportGenerator() {
                   Employees ({employees.length})
                 </h3>
                 <Link
-                  href="/calculators/time-report/employees-editor"
+                  href="/calculators/time-report/teams"
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  ⚙️ Edit
+                  ⚙️ Manage Teams
                 </Link>
               </div>
               <div className="space-y-2 max-h-[300px] overflow-y-auto">
