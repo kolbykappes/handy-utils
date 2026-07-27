@@ -95,6 +95,15 @@ export default function Home() {
       changelogId: "amex-tracker",
       localOnly: true,
     },
+    {
+      name: "Claude Spending",
+      description: "Paste Claude usage API response to view spending by user and export to Excel",
+      href: "/tools/claude-spending",
+      icon: "🤖",
+      version: "1.0",
+      updatedAt: "2026-07-27T00:00:00Z",
+      changelogId: "claude-spending",
+    },
   ];
 
   return (

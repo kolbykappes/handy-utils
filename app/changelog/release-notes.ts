@@ -323,6 +323,26 @@ export const changelogs: ToolChangelog[] = [
     ],
   },
   {
+    id: "claude-spending",
+    name: "Claude Spending",
+    icon: "🤖",
+    href: "/tools/claude-spending",
+    releases: [
+      {
+        version: "1.0",
+        date: "2026-07-27",
+        changes: [
+          "Initial release",
+          "Paste Claude usage API JSON to view name, email, and spending per user",
+          "Credits converted from cents to dollars automatically",
+          "Table sorted by spending (highest first) with total row",
+          "Export to Excel with currency formatting",
+          "Copy as tab-separated text for email pasting",
+        ],
+      },
+    ],
+  },
+  {
     id: "amex-tracker",
     name: "AmEx Tracker",
     icon: "💳",
