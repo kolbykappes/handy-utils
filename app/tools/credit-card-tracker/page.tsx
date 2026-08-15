@@ -70,6 +70,9 @@ export default function CreditCardTracker() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [monthFilter, setMonthFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState<"all" | EntityType | "unassigned">("all");
   const [searchInput, setSearchInput] = useState("");
@@ -95,8 +98,7 @@ export default function CreditCardTracker() {
     setIsLocal(host === "localhost" || host === "127.0.0.1");
   }, []);
 
-  useEffect(() => {
-    if (!isLocal) return;
+  const loadTransactions = () => {
     fetch("/api/credit-card-tracker")
       .then((r) => r.json())
       .then((data) => {
@@ -112,6 +114,12 @@ export default function CreditCardTracker() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!isLocal) return;
+    loadTransactions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocal]);
 
   useEffect(() => {
@@ -268,6 +276,35 @@ export default function CreditCardTracker() {
     });
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset so the same file can be picked again later
+    if (importInputRef.current) importInputRef.current.value = "";
+    setImportStatus("importing");
+    setImportResult(null);
+    try {
+      const csvText = await file.text();
+      const res = await fetch("/api/credit-card-tracker/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvText }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setImportResult({ inserted: data.inserted, skipped: data.skipped });
+      setImportStatus("done");
+      if (data.inserted > 0) {
+        // Reload transactions to pick up the new rows
+        setLoading(true);
+        loadTransactions();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+      setImportStatus("error");
+    }
+  };
+
   const exportXLSX = async () => {
     const rows = filtered.map((t) => {
       const e = effectiveMap.get(t.rowIndex)!;
@@ -360,6 +397,32 @@ export default function CreditCardTracker() {
               {saveStatus === "saving" && <span className="text-sm text-slate-400 dark:text-slate-500">Saving…</span>}
               {saveStatus === "saved" && <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved</span>}
               {saveStatus === "error" && <span className="text-sm text-red-600 dark:text-red-400">Save failed</span>}
+
+              {/* Import CSV */}
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleImport}
+              />
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={importStatus === "importing"}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors whitespace-nowrap"
+              >
+                {importStatus === "importing" ? "Importing…" : "Import CSV"}
+              </button>
+              {importStatus === "done" && importResult && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                  {importResult.inserted > 0
+                    ? `✓ ${importResult.inserted} new row${importResult.inserted !== 1 ? "s" : ""} added (${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped)`
+                    : `No new rows — ${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped`}
+                </span>
+              )}
+              {importStatus === "error" && (
+                <span className="text-xs text-red-600 dark:text-red-400">Import failed</span>
+              )}
 
               {/* Bulk expensed */}
               <div className="flex items-center gap-1.5">

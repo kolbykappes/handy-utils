@@ -297,6 +297,15 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.2",
+        date: "2026-08-15",
+        changes: [
+          "Added Import CSV button — pick a card export CSV to load new transactions",
+          "Deduplication by date + description + debit amount; shows rows added and duplicates skipped",
+          "Imported rows appended to source XLSX; tracker reloads automatically",
+        ],
+      },
+      {
         version: "1.1",
         date: "2026-07-16",
         changes: [
