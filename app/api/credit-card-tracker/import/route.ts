@@ -214,6 +214,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ inserted: newRows.length, skipped, rows: newRows });
   } catch (error) {
+    console.error("[import] Unhandled error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

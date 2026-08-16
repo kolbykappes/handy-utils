@@ -230,7 +230,7 @@ export default function CreditCardTracker() {
         return e.entity === entityFilter;
       }
       return true;
-    });
+    }).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, effectiveMap, monthFilter, entityFilter, search, showPayments, amountFilter, paidFilter]);
 
   // Summary card totals — driven by the same filtered set the table shows
