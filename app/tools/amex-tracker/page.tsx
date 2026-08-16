@@ -232,7 +232,7 @@ export default function AmexTracker() {
         }
       }
       return true;
-    });
+    }).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, effectiveMap, monthFilter, categoryFilter, filedFilter, search, amountFilter]);
 
   const totals = useMemo(() => {
