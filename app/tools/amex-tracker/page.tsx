@@ -284,6 +284,39 @@ export default function AmexTracker() {
     });
   };
 
+  const exportXLSX = async () => {
+    const rows = filtered.map((t) => {
+      const e = effectiveMap.get(t.rowIndex)!;
+      return {
+        date: t.date,
+        description: t.description,
+        amount: t.amount,
+        category: e.category ?? null,
+        filed: e.filed ?? false,
+        notes: e.notes ?? null,
+      };
+    });
+    const res = await fetch("/api/amex-tracker/export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rows,
+        category: categoryFilter === "all" ? null : categoryFilter,
+        monthLabel: monthFilter ? fmtMonth(monthFilter) : "Year to Date",
+      }),
+    });
+    if (!res.ok) {
+      setError("Excel export failed");
+      return;
+    }
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `amex-${categoryFilter === "all" ? "all" : categoryFilter}-${monthFilter || "ytd"}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -371,6 +404,13 @@ export default function AmexTracker() {
               {saveStatus === "error" && (
                 <span className="text-sm text-red-600 dark:text-red-400">Save failed</span>
               )}
+              <button
+                onClick={exportXLSX}
+                disabled={filtered.length === 0}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Export Excel
+              </button>
               <input
                 ref={importInputRef}
                 type="file"

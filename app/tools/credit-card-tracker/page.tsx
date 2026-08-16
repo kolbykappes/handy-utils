@@ -312,6 +312,9 @@ export default function CreditCardTracker() {
         date: t.date,
         description: t.description,
         amount: t.debit ?? (t.credit ? -Math.abs(t.credit) : null),
+        entity: e.entity ?? null,
+        dateExpensed: e.dateExpensed ?? null,
+        datePaid: e.datePaid ?? null,
         notes: e.notes ?? "",
       };
     });

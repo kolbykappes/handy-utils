@@ -297,6 +297,14 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.3",
+        date: "2026-08-16",
+        changes: [
+          "Export Excel now includes all grid columns: Date, Description, Debit, Entity, Expensed, Paid, Notes",
+          "Entity column is color-coded in the export (MTM green, EG purple, Kory blue, Me red, MTM-Me light green)",
+        ],
+      },
+      {
         version: "1.2",
         date: "2026-08-15",
         changes: [
@@ -357,6 +365,16 @@ export const changelogs: ToolChangelog[] = [
     icon: "💳",
     href: "/tools/amex-tracker",
     releases: [
+      {
+        version: "1.2",
+        date: "2026-08-16",
+        changes: [
+          "Added Export Excel button — downloads current filtered view as a formatted XLSX",
+          "Export includes all grid columns: Date, Description, Amount, Category, Filed, Notes",
+          "Category column is color-coded (MTM green, Personal blue); Filed shows ✓ in green",
+          "Title row reflects active category and month filters; totals row at the bottom",
+        ],
+      },
       {
         version: "1.1",
         date: "2026-08-16",
