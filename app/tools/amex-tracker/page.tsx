@@ -86,6 +86,10 @@ export default function AmexTracker() {
   const [search, setSearch] = useState("");
   const [showNotes, setShowNotes] = useState(false);
 
+  const [importStatus, setImportStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
 
@@ -100,25 +104,33 @@ export default function AmexTracker() {
     setIsLocal(host === "localhost" || host === "127.0.0.1");
   }, []);
 
+  const loadTransactions = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch("/api/amex-tracker");
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      setTransactions(data.transactions);
+      if (data.transactions.length > 0) {
+        const months = Array.from(
+          new Set<string>(
+            data.transactions.map((t: AmexTransaction) => t.date.substring(0, 7))
+          )
+        );
+        months.sort().reverse();
+        setMonthFilter(months[0]);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isLocal) return;
-    fetch("/api/amex-tracker")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) throw new Error(data.error);
-        setTransactions(data.transactions);
-        if (data.transactions.length > 0) {
-          const months = Array.from(
-            new Set<string>(
-              data.transactions.map((t: AmexTransaction) => t.date.substring(0, 7))
-            )
-          );
-          months.sort().reverse();
-          setMonthFilter(months[0]);
-        }
-      })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
+    loadTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocal]);
 
   useEffect(() => {
@@ -272,6 +284,34 @@ export default function AmexTracker() {
     });
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset so the same file can be re-selected
+    setImportStatus("importing");
+    setImportResult(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const fileBase64 = btoa(binary);
+      const res = await fetch("/api/amex-tracker/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileBase64 }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setImportResult({ inserted: data.inserted, skipped: data.skipped });
+      setImportStatus("done");
+      if (data.inserted > 0) await loadTransactions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+      setImportStatus("error");
+    }
+  };
+
   if (isLocal === null) return null;
 
   if (!isLocal) {
@@ -331,6 +371,20 @@ export default function AmexTracker() {
               {saveStatus === "error" && (
                 <span className="text-sm text-red-600 dark:text-red-400">Save failed</span>
               )}
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={handleImport}
+              />
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={importStatus === "importing"}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {importStatus === "importing" ? "Importing…" : "Import XLSX"}
+              </button>
             </div>
           </div>
         </div>
@@ -338,6 +392,20 @@ export default function AmexTracker() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">
             {error}
+          </div>
+        )}
+
+        {importResult && (
+          <div
+            className={`mb-4 p-3 rounded-lg border text-sm ${
+              importResult.inserted > 0
+                ? "bg-emerald-50 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400"
+                : "bg-slate-50 dark:bg-slate-700/30 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            {importResult.inserted > 0
+              ? `✓ ${importResult.inserted} new row${importResult.inserted !== 1 ? "s" : ""} added (${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped)`
+              : `No new rows — ${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped`}
           </div>
         )}
 

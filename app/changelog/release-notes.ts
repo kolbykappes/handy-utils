@@ -358,6 +358,16 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/amex-tracker",
     releases: [
       {
+        version: "1.1",
+        date: "2026-08-16",
+        changes: [
+          "Added Import XLSX button — pick an AmEx activity export to load new transactions",
+          "Deduplication by date + description + amount; shows rows added and duplicates skipped",
+          "Imported rows appended to source XLSX; tracker reloads automatically",
+          "Re-runnable: safe to import the same file twice without creating duplicates",
+        ],
+      },
+      {
         version: "1.0",
         date: "2026-07-16",
         changes: [
