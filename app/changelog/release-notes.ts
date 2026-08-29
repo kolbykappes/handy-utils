@@ -297,6 +297,14 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.5",
+        date: "2026-08-29",
+        changes: [
+          "Added row delete — hover any row to reveal ×, click to arm (row highlights red), confirm with ✓ or cancel with ✗",
+          "Delete writes through to the source XLSX and reloads the tracker",
+        ],
+      },
+      {
         version: "1.4",
         date: "2026-08-29",
         changes: [

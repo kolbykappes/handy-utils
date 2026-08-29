@@ -73,6 +73,7 @@ export default function CreditCardTracker() {
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
   const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [pendingDeleteRow, setPendingDeleteRow] = useState<number | null>(null);
   const [monthFilter, setMonthFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState<"all" | EntityType | "unassigned">("all");
   const [searchInput, setSearchInput] = useState("");
@@ -302,6 +303,24 @@ export default function CreditCardTracker() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
       setImportStatus("error");
+    }
+  };
+
+  const deleteRow = async (rowIndex: number) => {
+    try {
+      const res = await fetch("/api/credit-card-tracker/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setPendingDeleteRow(null);
+      setPending((prev) => { const next = new Map(prev); next.delete(rowIndex); return next; });
+      await loadTransactions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+      setPendingDeleteRow(null);
     }
   };
 
@@ -625,6 +644,7 @@ export default function CreditCardTracker() {
               <col style={{ width: 240 }} />
               <col style={{ width: 130 }} />
               <col style={{ width: 130 }} />
+              <col style={{ width: 36 }} />
             </colgroup>
             <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
               <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -635,14 +655,15 @@ export default function CreditCardTracker() {
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400">Notes</th>
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Expensed</th>
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Paid</th>
+                <th />
               </tr>
             </thead>
             <tbody ref={tbodyRef}>
-              {paddingTop > 0 && <tr><td colSpan={7} style={{ height: paddingTop }} /></tr>}
+              {paddingTop > 0 && <tr><td colSpan={8} style={{ height: paddingTop }} /></tr>}
 
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
                       No transactions match the current filters
                     </td>
                   </tr>
@@ -653,15 +674,19 @@ export default function CreditCardTracker() {
                     const isDirty = pending.has(t.rowIndex);
                     const isPayment = t.debit === null && t.credit !== null;
 
+                    const isArmed = pendingDeleteRow === t.rowIndex;
+
                     return (
                       <tr
                         key={t.rowIndex}
-                        className={`${
-                          isDirty
+                        className={`group ${
+                          isArmed
+                            ? "bg-red-50 dark:bg-red-900/20"
+                            : isDirty
                             ? "bg-amber-50 dark:bg-amber-900/10"
                             : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
                         } transition-colors ${
-                          e.entity && !isPayment ? ENTITY_ROW_STYLES[e.entity] : "border-l-4 border-transparent"
+                          !isArmed && e.entity && !isPayment ? ENTITY_ROW_STYLES[e.entity] : isArmed ? "border-l-4 border-red-400" : "border-l-4 border-transparent"
                         }`}
                       >
                         <td className="px-3 py-2 whitespace-nowrap">
@@ -736,12 +761,34 @@ export default function CreditCardTracker() {
                             className="w-full px-1 py-1 rounded border border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-400 bg-transparent focus:bg-white dark:focus:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs outline-none transition-colors"
                           />
                         </td>
+                        <td className="py-2 pr-2 text-center">
+                          {isArmed ? (
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                onClick={() => deleteRow(t.rowIndex)}
+                                title="Confirm delete"
+                                className="px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
+                              >✓</button>
+                              <button
+                                onClick={() => setPendingDeleteRow(null)}
+                                title="Cancel"
+                                className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors"
+                              >✗</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setPendingDeleteRow(t.rowIndex)}
+                              title="Delete row"
+                              className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-all text-base leading-none"
+                            >×</button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })
                 )}
 
-              {paddingBottom > 0 && <tr><td colSpan={7} style={{ height: paddingBottom }} /></tr>}
+              {paddingBottom > 0 && <tr><td colSpan={8} style={{ height: paddingBottom }} /></tr>}
             </tbody>
           </table>
 

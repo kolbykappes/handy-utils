@@ -80,7 +80,7 @@ export default function Home() {
       description: "Categorize 5179 card charges by entity (MTM, EG, Kory, Me) and track expense/payment dates",
       href: "/tools/credit-card-tracker",
       icon: "💳",
-      version: "1.4",
+      version: "1.5",
       updatedAt: "2026-08-29T00:00:00Z",
       changelogId: "credit-card-tracker",
       localOnly: true,
