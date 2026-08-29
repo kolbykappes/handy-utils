@@ -418,4 +418,29 @@ export const changelogs: ToolChangelog[] = [
       },
     ],
   },
+  {
+    id: "bmw-tracker",
+    name: "BMW Tracker",
+    icon: "🚗",
+    href: "/tools/bmw-tracker",
+    releases: [
+      {
+        version: "1.0",
+        date: "2026-08-29",
+        changes: [
+          "Initial release",
+          "Categorize BMW credit card charges as EG, MTM, or Personal",
+          "Filed checkbox per charge to track expense submission status",
+          "Notes field per row; notes column hides automatically on narrow screens",
+          "Filters: month, category, filed status, amount range, description search",
+          "Summary cards for EG, MTM, Personal, and Unassigned showing filed/unfiled counts",
+          "Import CSV — pick a BMW card export to load new transactions with memo-based dedup",
+          "Export Excel — downloads current filtered view as a formatted XLSX",
+          "Row delete with two-click confirm to remove duplicate or misimported rows",
+          "Auto-save writes category, filed status, and notes back to source XLSX (30-second debounce)",
+          "Hourly archive of source XLSX before each write",
+        ],
+      },
+    ],
+  },
 ];

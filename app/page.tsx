@@ -96,6 +96,16 @@ export default function Home() {
       localOnly: true,
     },
     {
+      name: "BMW Tracker",
+      description: "Categorize BMW credit card charges as EG, MTM, or Personal and track filing status",
+      href: "/tools/bmw-tracker",
+      icon: "🚗",
+      version: "1.0",
+      updatedAt: "2026-08-29T00:00:00Z",
+      changelogId: "bmw-tracker",
+      localOnly: true,
+    },
+    {
       name: "Claude Spending",
       description: "Paste Claude usage API response to view spending by user and export to Excel",
       href: "/tools/claude-spending",
