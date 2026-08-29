@@ -44,12 +44,6 @@ function normaliseXlsxDate(val: unknown): string | null {
   return mmddyyyyToISO(s);
 }
 
-/** "YYYY-MM-DD" → Excel date serial */
-function isoToSerial(iso: string): number {
-  const d = new Date(iso + "T12:00:00Z");
-  return Math.round(d.getTime() / 86400000) + 25569;
-}
-
 // ── Manual CSV parser (RFC 4180) ──────────────────────────────────────────────
 // Avoids SheetJS date/number interpretation that silently reformats cell values.
 
@@ -151,6 +145,15 @@ export async function POST(request: NextRequest) {
       if (isNaN(debit) || debit <= 0) continue;
       const desc = String(row[COL.DESCRIPTION] ?? "").trim();
       existingKeys.add(makeKey(dateStr, desc, debit));
+      // Guard against previously-imported rows whose date serial was stored one day
+      // ahead due to a noon-UTC rounding bug in the old isoToSerial function.
+      // Also register the key with date shifted back by one day so those rows are
+      // still recognised as duplicates even though their stored date is off by one.
+      if (typeof row[COL.DATE] === "number") {
+        const d = new Date(dateStr + "T00:00:00Z");
+        d.setUTCDate(d.getUTCDate() - 1);
+        existingKeys.add(makeKey(d.toISOString().split("T")[0], desc, debit));
+      }
     }
 
     // 2. Parse the CSV with our own parser — values stay as raw text strings
@@ -194,11 +197,9 @@ export async function POST(request: NextRequest) {
     let nextRow = range.e.r + 1;
 
     for (const row of newRows) {
-      ws[XLSX.utils.encode_cell({ r: nextRow, c: COL.DATE })] = {
-        t: "n",
-        v: isoToSerial(row.date),
-        z: "mm/dd/yyyy",
-      };
+      // Store date as ISO text ("YYYY-MM-DD") — avoids serial round-trip bugs and
+      // is handled correctly by both parseRawDate and normaliseXlsxDate on read.
+      ws[XLSX.utils.encode_cell({ r: nextRow, c: COL.DATE })] = { t: "s", v: row.date };
       ws[XLSX.utils.encode_cell({ r: nextRow, c: COL.DESCRIPTION })] = { t: "s", v: row.description };
       ws[XLSX.utils.encode_cell({ r: nextRow, c: COL.DEBIT })] = { t: "n", v: row.debit };
       nextRow++;

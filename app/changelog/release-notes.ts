@@ -297,6 +297,15 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.4",
+        date: "2026-08-29",
+        changes: [
+          "Fixed CSV import dedup — re-importing the same file no longer creates duplicate rows",
+          "Root cause: imported dates were stored with an Excel serial one day ahead (noon-UTC rounding bug); now stored as ISO text strings which round-trip exactly",
+          "Backward compat: existing rows with the off-by-one serial are still recognised as duplicates via a -1 day fallback key",
+        ],
+      },
+      {
         version: "1.3",
         date: "2026-08-16",
         changes: [
