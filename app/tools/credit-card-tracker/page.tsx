@@ -166,7 +166,7 @@ export default function CreditCardTracker() {
         setError(e instanceof Error ? e.message : "Save failed");
         setSaveStatus("error");
       }
-    }, 1500);
+    }, 30000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending]);
