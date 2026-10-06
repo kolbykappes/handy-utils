@@ -201,6 +201,17 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/weather-days",
     releases: [
       {
+        version: "1.3",
+        date: "2026-10-06",
+        changes: [
+          "Fixed US zip codes resolving to foreign cities (e.g. 41425 matching Ussuriysk, Russia) by sending the bare zip instead of \"US 12345\"",
+          "Weather lookups now error out if a 5-digit zip resolves outside the US",
+          "Fixed stale report staying on screen after switching jobs",
+          "Report now shows the location WeatherAPI resolved for the zip code",
+          "Disabled HTTP caching on weather requests",
+        ],
+      },
+      {
         version: "1.2",
         date: "2026-02-08",
         changes: [

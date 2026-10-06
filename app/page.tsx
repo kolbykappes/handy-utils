@@ -53,8 +53,8 @@ export default function Home() {
       description: "Track historical weather data (temps and precipitation) for job sites",
       href: "/tools/weather-days",
       icon: "🌤️",
-      version: "1.2",
-      updatedAt: "2026-02-08T19:58:00Z",
+      version: "1.3",
+      updatedAt: "2026-10-06T12:00:00Z",
       changelogId: "weather-days",
     },
     {

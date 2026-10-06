@@ -17,6 +17,7 @@ export interface WeatherData {
   jobId: string;
   jobTitle: string;
   zipCode: string;
+  resolvedLocation?: string;
   startDate: string;
   endDate: string;
   days: WeatherDay[];

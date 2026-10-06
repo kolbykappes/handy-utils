@@ -201,7 +201,13 @@ export default function WeatherDays() {
                       ? "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
                       : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
-                  onClick={() => setSelectedJob(job)}
+                  onClick={() => {
+                    if (selectedJob?.id !== job.id) {
+                      setSelectedJob(job);
+                      setWeatherData(null);
+                      setError(null);
+                    }
+                  }}
                 >
                   <div>
                     <div className="font-semibold">{job.title}</div>
@@ -286,6 +292,7 @@ export default function WeatherDays() {
                   <strong>Job:</strong> {weatherData.jobTitle}
                   <br />
                   <strong>Zip Code:</strong> {weatherData.zipCode}
+                  {weatherData.resolvedLocation && ` (${weatherData.resolvedLocation})`}
                   <br />
                   <strong>Date Range:</strong>{" "}
                   {new Date(weatherData.startDate).toLocaleDateString()} -{" "}
