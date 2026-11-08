@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
       // Debit-only: skip rows with no debit value
       const debitStr = row[CSV.DEBIT];
       if (!debitStr || debitStr.trim() === "") continue;
-      const debit = parseFloat(debitStr.replace(/,/g, ""));
+      const debit = parseFloat(debitStr.replace(/[$,\s]/g, ""));
       if (isNaN(debit) || debit <= 0) continue;
 
       // Date must be MM/DD/YYYY

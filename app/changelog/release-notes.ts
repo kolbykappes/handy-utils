@@ -308,6 +308,13 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.6",
+        date: "2026-11-08",
+        changes: [
+          "Fixed CSV import for exports that prefix debit amounts with '$ ' (e.g. '$ 16.19') — previously all rows were silently skipped",
+        ],
+      },
+      {
         version: "1.5",
         date: "2026-08-29",
         changes: [
