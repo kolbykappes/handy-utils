@@ -11,6 +11,7 @@ export async function fetchWeatherData(
   const start = new Date(startDate);
   const end = new Date(endDate);
   const days: WeatherDay[] = [];
+  let resolvedLocation: string | undefined;
 
   // Iterate through each day in the range
   const currentDate = new Date(start);
@@ -18,13 +19,14 @@ export async function fetchWeatherData(
     const dateStr = currentDate.toISOString().split("T")[0]; // YYYY-MM-DD format
 
     try {
-      // Format zip code for US locations (WeatherAPI prefers "US zipcode" format)
-      const locationQuery = /^\d{5}$/.test(job.zipCode)
-        ? `US ${job.zipCode}`
-        : job.zipCode;
+      // WeatherAPI recognizes a bare 5-digit string as a US zip code; a "US 12345"
+      // prefix is treated as free text and can match foreign cities.
+      const isUsZip = /^\d{5}$/.test(job.zipCode.trim());
+      const locationQuery = job.zipCode.trim();
 
       const response = await fetch(
-        `${WEATHER_API_BASE}?key=${apiKey}&q=${encodeURIComponent(locationQuery)}&dt=${dateStr}`
+        `${WEATHER_API_BASE}?key=${apiKey}&q=${encodeURIComponent(locationQuery)}&dt=${dateStr}`,
+        { cache: "no-store" }
       );
 
       if (!response.ok) {
@@ -42,6 +44,18 @@ export async function fetchWeatherData(
       }
 
       const data = await response.json();
+
+      if (isUsZip && data.location && !/^(united states|usa|us)/i.test(data.location.country ?? "")) {
+        throw new Error(
+          `Zip ${job.zipCode} resolved to ${data.location.name}, ${data.location.country} — not a US location`
+        );
+      }
+
+      if (data.location) {
+        resolvedLocation = [data.location.name, data.location.region]
+          .filter(Boolean)
+          .join(", ");
+      }
 
       // Extract the day data
       const dayData = data.forecast.forecastday[0].day;
@@ -66,6 +80,7 @@ export async function fetchWeatherData(
     jobId: job.id,
     jobTitle: job.title,
     zipCode: job.zipCode,
+    resolvedLocation,
     startDate,
     endDate,
     days,

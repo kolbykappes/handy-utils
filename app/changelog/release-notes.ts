@@ -201,6 +201,17 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/weather-days",
     releases: [
       {
+        version: "1.3",
+        date: "2026-10-06",
+        changes: [
+          "Fixed US zip codes resolving to foreign cities (e.g. 41425 matching Ussuriysk, Russia) by sending the bare zip instead of \"US 12345\"",
+          "Weather lookups now error out if a 5-digit zip resolves outside the US",
+          "Fixed stale report staying on screen after switching jobs",
+          "Report now shows the location WeatherAPI resolved for the zip code",
+          "Disabled HTTP caching on weather requests",
+        ],
+      },
+      {
         version: "1.2",
         date: "2026-02-08",
         changes: [
@@ -297,6 +308,47 @@ export const changelogs: ToolChangelog[] = [
     href: "/tools/credit-card-tracker",
     releases: [
       {
+        version: "1.6",
+        date: "2026-11-08",
+        changes: [
+          "Fixed CSV import for exports that prefix debit amounts with '$ ' (e.g. '$ 16.19') — previously all rows were silently skipped",
+        ],
+      },
+      {
+        version: "1.5",
+        date: "2026-08-29",
+        changes: [
+          "Added row delete — hover any row to reveal ×, click to arm (row highlights red), confirm with ✓ or cancel with ✗",
+          "Delete writes through to the source XLSX and reloads the tracker",
+        ],
+      },
+      {
+        version: "1.4",
+        date: "2026-08-29",
+        changes: [
+          "Fixed CSV import dedup — re-importing the same file no longer creates duplicate rows",
+          "Root cause: imported dates were stored with an Excel serial one day ahead (noon-UTC rounding bug); now stored as ISO text strings which round-trip exactly",
+          "Backward compat: existing rows with the off-by-one serial are still recognised as duplicates via a -1 day fallback key",
+        ],
+      },
+      {
+        version: "1.3",
+        date: "2026-08-16",
+        changes: [
+          "Export Excel now includes all grid columns: Date, Description, Debit, Entity, Expensed, Paid, Notes",
+          "Entity column is color-coded in the export (MTM green, EG purple, Kory blue, Me red, MTM-Me light green)",
+        ],
+      },
+      {
+        version: "1.2",
+        date: "2026-08-15",
+        changes: [
+          "Added Import CSV button — pick a card export CSV to load new transactions",
+          "Deduplication by date + description + debit amount; shows rows added and duplicates skipped",
+          "Imported rows appended to source XLSX; tracker reloads automatically",
+        ],
+      },
+      {
         version: "1.1",
         date: "2026-07-16",
         changes: [
@@ -323,11 +375,51 @@ export const changelogs: ToolChangelog[] = [
     ],
   },
   {
+    id: "claude-spending",
+    name: "Claude Spending",
+    icon: "🤖",
+    href: "/tools/claude-spending",
+    releases: [
+      {
+        version: "1.0",
+        date: "2026-07-27",
+        changes: [
+          "Initial release",
+          "Paste Claude usage API JSON to view name, email, and spending per user",
+          "Credits converted from cents to dollars automatically",
+          "Table sorted by spending (highest first) with total row",
+          "Export to Excel with currency formatting",
+          "Copy as tab-separated text for email pasting",
+        ],
+      },
+    ],
+  },
+  {
     id: "amex-tracker",
     name: "AmEx Tracker",
     icon: "💳",
     href: "/tools/amex-tracker",
     releases: [
+      {
+        version: "1.2",
+        date: "2026-08-16",
+        changes: [
+          "Added Export Excel button — downloads current filtered view as a formatted XLSX",
+          "Export includes all grid columns: Date, Description, Amount, Category, Filed, Notes",
+          "Category column is color-coded (MTM green, Personal blue); Filed shows ✓ in green",
+          "Title row reflects active category and month filters; totals row at the bottom",
+        ],
+      },
+      {
+        version: "1.1",
+        date: "2026-08-16",
+        changes: [
+          "Added Import XLSX button — pick an AmEx activity export to load new transactions",
+          "Deduplication by date + description + amount; shows rows added and duplicates skipped",
+          "Imported rows appended to source XLSX; tracker reloads automatically",
+          "Re-runnable: safe to import the same file twice without creating duplicates",
+        ],
+      },
       {
         version: "1.0",
         date: "2026-07-16",
@@ -340,6 +432,31 @@ export const changelogs: ToolChangelog[] = [
           "Summary cards for MTM, Personal, and Unassigned showing filed/unfiled counts",
           "Auto-save writes category, filed status, and notes back to source XLSX",
           "Hourly archive of source XLSX before each save",
+        ],
+      },
+    ],
+  },
+  {
+    id: "bmw-tracker",
+    name: "BMW Tracker",
+    icon: "🚗",
+    href: "/tools/bmw-tracker",
+    releases: [
+      {
+        version: "1.0",
+        date: "2026-08-29",
+        changes: [
+          "Initial release",
+          "Categorize BMW credit card charges as EG, MTM, or Personal",
+          "Filed checkbox per charge to track expense submission status",
+          "Notes field per row; notes column hides automatically on narrow screens",
+          "Filters: month, category, filed status, amount range, description search",
+          "Summary cards for EG, MTM, Personal, and Unassigned showing filed/unfiled counts",
+          "Import CSV — pick a BMW card export to load new transactions with memo-based dedup",
+          "Export Excel — downloads current filtered view as a formatted XLSX",
+          "Row delete with two-click confirm to remove duplicate or misimported rows",
+          "Auto-save writes category, filed status, and notes back to source XLSX (30-second debounce)",
+          "Hourly archive of source XLSX before each write",
         ],
       },
     ],

@@ -70,6 +70,10 @@ export default function CreditCardTracker() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<"idle" | "importing" | "done" | "error">("idle");
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [pendingDeleteRow, setPendingDeleteRow] = useState<number | null>(null);
   const [monthFilter, setMonthFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState<"all" | EntityType | "unassigned">("all");
   const [searchInput, setSearchInput] = useState("");
@@ -95,8 +99,7 @@ export default function CreditCardTracker() {
     setIsLocal(host === "localhost" || host === "127.0.0.1");
   }, []);
 
-  useEffect(() => {
-    if (!isLocal) return;
+  const loadTransactions = () => {
     fetch("/api/credit-card-tracker")
       .then((r) => r.json())
       .then((data) => {
@@ -112,6 +115,12 @@ export default function CreditCardTracker() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!isLocal) return;
+    loadTransactions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLocal]);
 
   useEffect(() => {
@@ -157,7 +166,7 @@ export default function CreditCardTracker() {
         setError(e instanceof Error ? e.message : "Save failed");
         setSaveStatus("error");
       }
-    }, 1500);
+    }, 30000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending]);
@@ -222,7 +231,7 @@ export default function CreditCardTracker() {
         return e.entity === entityFilter;
       }
       return true;
-    });
+    }).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, effectiveMap, monthFilter, entityFilter, search, showPayments, amountFilter, paidFilter]);
 
   // Summary card totals — driven by the same filtered set the table shows
@@ -268,6 +277,53 @@ export default function CreditCardTracker() {
     });
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset so the same file can be picked again later
+    if (importInputRef.current) importInputRef.current.value = "";
+    setImportStatus("importing");
+    setImportResult(null);
+    try {
+      const csvText = await file.text();
+      const res = await fetch("/api/credit-card-tracker/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csvText }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setImportResult({ inserted: data.inserted, skipped: data.skipped });
+      setImportStatus("done");
+      if (data.inserted > 0) {
+        // Reload transactions to pick up the new rows
+        setLoading(true);
+        loadTransactions();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+      setImportStatus("error");
+    }
+  };
+
+  const deleteRow = async (rowIndex: number) => {
+    try {
+      const res = await fetch("/api/credit-card-tracker/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowIndex }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setPendingDeleteRow(null);
+      setPending((prev) => { const next = new Map(prev); next.delete(rowIndex); return next; });
+      await loadTransactions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+      setPendingDeleteRow(null);
+    }
+  };
+
   const exportXLSX = async () => {
     const rows = filtered.map((t) => {
       const e = effectiveMap.get(t.rowIndex)!;
@@ -275,6 +331,9 @@ export default function CreditCardTracker() {
         date: t.date,
         description: t.description,
         amount: t.debit ?? (t.credit ? -Math.abs(t.credit) : null),
+        entity: e.entity ?? null,
+        dateExpensed: e.dateExpensed ?? null,
+        datePaid: e.datePaid ?? null,
         notes: e.notes ?? "",
       };
     });
@@ -360,6 +419,32 @@ export default function CreditCardTracker() {
               {saveStatus === "saving" && <span className="text-sm text-slate-400 dark:text-slate-500">Saving…</span>}
               {saveStatus === "saved" && <span className="text-sm text-emerald-600 dark:text-emerald-400">Saved</span>}
               {saveStatus === "error" && <span className="text-sm text-red-600 dark:text-red-400">Save failed</span>}
+
+              {/* Import CSV */}
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleImport}
+              />
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={importStatus === "importing"}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors whitespace-nowrap"
+              >
+                {importStatus === "importing" ? "Importing…" : "Import CSV"}
+              </button>
+              {importStatus === "done" && importResult && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                  {importResult.inserted > 0
+                    ? `✓ ${importResult.inserted} new row${importResult.inserted !== 1 ? "s" : ""} added (${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped)`
+                    : `No new rows — ${importResult.skipped} duplicate${importResult.skipped !== 1 ? "s" : ""} skipped`}
+                </span>
+              )}
+              {importStatus === "error" && (
+                <span className="text-xs text-red-600 dark:text-red-400">Import failed</span>
+              )}
 
               {/* Bulk expensed */}
               <div className="flex items-center gap-1.5">
@@ -559,6 +644,7 @@ export default function CreditCardTracker() {
               <col style={{ width: 240 }} />
               <col style={{ width: 130 }} />
               <col style={{ width: 130 }} />
+              <col style={{ width: 36 }} />
             </colgroup>
             <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900">
               <tr className="border-b border-slate-200 dark:border-slate-700">
@@ -569,14 +655,15 @@ export default function CreditCardTracker() {
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400">Notes</th>
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Expensed</th>
                 <th className="px-3 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">Paid</th>
+                <th />
               </tr>
             </thead>
             <tbody ref={tbodyRef}>
-              {paddingTop > 0 && <tr><td colSpan={7} style={{ height: paddingTop }} /></tr>}
+              {paddingTop > 0 && <tr><td colSpan={8} style={{ height: paddingTop }} /></tr>}
 
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
                       No transactions match the current filters
                     </td>
                   </tr>
@@ -587,15 +674,19 @@ export default function CreditCardTracker() {
                     const isDirty = pending.has(t.rowIndex);
                     const isPayment = t.debit === null && t.credit !== null;
 
+                    const isArmed = pendingDeleteRow === t.rowIndex;
+
                     return (
                       <tr
                         key={t.rowIndex}
-                        className={`${
-                          isDirty
+                        className={`group ${
+                          isArmed
+                            ? "bg-red-50 dark:bg-red-900/20"
+                            : isDirty
                             ? "bg-amber-50 dark:bg-amber-900/10"
                             : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
                         } transition-colors ${
-                          e.entity && !isPayment ? ENTITY_ROW_STYLES[e.entity] : "border-l-4 border-transparent"
+                          !isArmed && e.entity && !isPayment ? ENTITY_ROW_STYLES[e.entity] : isArmed ? "border-l-4 border-red-400" : "border-l-4 border-transparent"
                         }`}
                       >
                         <td className="px-3 py-2 whitespace-nowrap">
@@ -670,12 +761,34 @@ export default function CreditCardTracker() {
                             className="w-full px-1 py-1 rounded border border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-400 bg-transparent focus:bg-white dark:focus:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs outline-none transition-colors"
                           />
                         </td>
+                        <td className="py-2 pr-2 text-center">
+                          {isArmed ? (
+                            <div className="flex gap-1 justify-center">
+                              <button
+                                onClick={() => deleteRow(t.rowIndex)}
+                                title="Confirm delete"
+                                className="px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
+                              >✓</button>
+                              <button
+                                onClick={() => setPendingDeleteRow(null)}
+                                title="Cancel"
+                                className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors"
+                              >✗</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setPendingDeleteRow(t.rowIndex)}
+                              title="Delete row"
+                              className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-all text-base leading-none"
+                            >×</button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })
                 )}
 
-              {paddingBottom > 0 && <tr><td colSpan={7} style={{ height: paddingBottom }} /></tr>}
+              {paddingBottom > 0 && <tr><td colSpan={8} style={{ height: paddingBottom }} /></tr>}
             </tbody>
           </table>
 

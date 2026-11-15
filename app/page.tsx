@@ -53,8 +53,8 @@ export default function Home() {
       description: "Track historical weather data (temps and precipitation) for job sites",
       href: "/tools/weather-days",
       icon: "🌤️",
-      version: "1.2",
-      updatedAt: "2026-02-08T19:58:00Z",
+      version: "1.3",
+      updatedAt: "2026-10-06T12:00:00Z",
       changelogId: "weather-days",
     },
     {
@@ -80,8 +80,8 @@ export default function Home() {
       description: "Categorize 5179 card charges by entity (MTM, EG, Kory, Me) and track expense/payment dates",
       href: "/tools/credit-card-tracker",
       icon: "💳",
-      version: "1.1",
-      updatedAt: "2026-07-16T00:00:00Z",
+      version: "1.6",
+      updatedAt: "2026-11-08T00:00:00Z",
       changelogId: "credit-card-tracker",
       localOnly: true,
     },
@@ -90,10 +90,29 @@ export default function Home() {
       description: "Categorize AmEx business card charges as MTM or Personal and track expense filing status",
       href: "/tools/amex-tracker",
       icon: "💳",
-      version: "1.0",
-      updatedAt: "2026-05-24T00:00:00Z",
+      version: "1.2",
+      updatedAt: "2026-08-16T00:00:00Z",
       changelogId: "amex-tracker",
       localOnly: true,
+    },
+    {
+      name: "BMW Tracker",
+      description: "Categorize BMW credit card charges as EG, MTM, or Personal and track filing status",
+      href: "/tools/bmw-tracker",
+      icon: "🚗",
+      version: "1.0",
+      updatedAt: "2026-08-29T00:00:00Z",
+      changelogId: "bmw-tracker",
+      localOnly: true,
+    },
+    {
+      name: "Claude Spending",
+      description: "Paste Claude usage API response to view spending by user and export to Excel",
+      href: "/tools/claude-spending",
+      icon: "🤖",
+      version: "1.0",
+      updatedAt: "2026-07-27T00:00:00Z",
+      changelogId: "claude-spending",
     },
     {
       name: "Receipt Generator",
@@ -107,7 +126,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <header className="mb-12 text-center">
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Handy Utils
@@ -123,7 +142,7 @@ export default function Home() {
           </Link>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {calculators.map((calculator) => {
             const disabled = calculator.localOnly && !isLocal;
 
@@ -131,27 +150,23 @@ export default function Home() {
               return (
                 <div
                   key={calculator.href}
-                  className="block p-6 bg-white dark:bg-slate-800 rounded-xl shadow border border-slate-200 dark:border-slate-700 opacity-50 cursor-not-allowed select-none"
+                  className="flex flex-col p-5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed select-none"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl grayscale">{calculator.icon}</div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                          {calculator.name}
-                        </h2>
-                        <span className="shrink-0 text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded">
-                          Local only
-                        </span>
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
-                        {calculator.description}
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">
-                        Run locally at localhost:3000 to use this tool
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-3xl grayscale">{calculator.icon}</span>
+                    <span className="text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-400 px-2 py-0.5 rounded">
+                      Local only
+                    </span>
                   </div>
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1.5 leading-snug">
+                    {calculator.name}
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm flex-1 mb-3 leading-relaxed">
+                    {calculator.description}
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    Run locally to use this tool
+                  </p>
                 </div>
               );
             }
@@ -160,34 +175,30 @@ export default function Home() {
               <Link
                 key={calculator.href}
                 href={calculator.href}
-                className="group block p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 border border-slate-200 dark:border-slate-700"
+                className="group flex flex-col p-5 bg-white dark:bg-slate-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600"
               >
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{calculator.icon}</div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                        {calculator.name}
-                      </h2>
-                      <span
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.location.href = `/changelog#${calculator.changelogId}`;
-                        }}
-                        className="shrink-0 text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 cursor-pointer transition-colors"
-                        title="View changelog"
-                      >
-                        v{calculator.version}
-                      </span>
-                    </div>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">
-                      {calculator.description}
-                    </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
-                      Updated {new Date(calculator.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })} at {new Date(calculator.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-3xl">{calculator.icon}</span>
+                  <span
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.location.href = `/changelog#${calculator.changelogId}`;
+                    }}
+                    className="text-xs text-slate-400 dark:text-slate-500 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 cursor-pointer transition-colors"
+                    title="View changelog"
+                  >
+                    v{calculator.version}
+                  </span>
                 </div>
+                <h2 className="text-base font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-1.5 leading-snug">
+                  {calculator.name}
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400 text-sm flex-1 mb-3 leading-relaxed">
+                  {calculator.description}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  {new Date(calculator.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                </p>
               </Link>
             );
           })}
