@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local data files (credit card tracker storage)
+app/source-docs/*.xlsx
+app/source-docs/*.csv
+app/source-docs/*.CSV
+app/source-docs/*.pdf
