@@ -114,6 +114,14 @@ export default function Home() {
       updatedAt: "2026-07-27T00:00:00Z",
       changelogId: "claude-spending",
     },
+    {
+      name: "Receipt Generator",
+      description: "Generate a test receipt PDF given a merchant, date, and amount",
+      href: "/tools/receipt-generator",
+      icon: "🧾",
+      version: "1.0",
+      updatedAt: "2026-02-12",
+    },
   ];
 
   return (
